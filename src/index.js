@@ -1,5 +1,6 @@
 import express from "express";
-import { twiml } from "twilio";
+import pkg from "twilio";
+const { twiml } = pkg;;
 import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
 
