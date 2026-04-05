@@ -1,8 +1,12 @@
+// Thies Ma Ville — WhatsApp Bot v2
+// Twilio + Supabase + Claude AI
+
 import express from "express";
 import pkg from "twilio";
 const { twiml } = pkg;
 import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -11,213 +15,269 @@ app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// ─── In-memory session store (replace with Redis in production) ───────────────
+const BOT_NAME = "Thies Ma Ville";
+const WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+14155238886";
+
+// ─── Session store ────────────────────────────────────────────────────────────
 const sessions = new Map();
 
 function getSession(from) {
   if (!sessions.has(from)) {
-    sessions.set(from, { history: [], role: null });
+    sessions.set(from, { history: [], benevole: null });
   }
   return sessions.get(from);
 }
 
-// ─── Campaign configuration (set via env or hardcode after onboarding) ────────
-const CAMPAIGN = {
-  candidate: process.env.CANDIDATE_NAME || "Le candidat",
-  movement: process.env.MOVEMENT_NAME || "Notre mouvement",
-  opponents: process.env.OPPONENTS || "L'adjoint au maire actuel",
-  topIssue: process.env.TOP_ISSUE || "eau potable, routes, chômage des jeunes",
-};
+// ─── Generate referral code ───────────────────────────────────────────────────
+function generateCode(phone) {
+  // Use last 8 digits of phone for code
+  const digits = phone.replace(/\D/g, "").slice(-8);
+  return `TMV${digits}`;
+}
+
+// ─── Extract clean phone number ───────────────────────────────────────────────
+function cleanPhone(from) {
+  // from = "whatsapp:+221XXXXXXXXX"
+  return from.replace("whatsapp:", "");
+}
+
+// ─── Track WhatsApp user in Supabase ─────────────────────────────────────────
+async function trackWhatsAppUser(from, profileName = null, referredBy = null) {
+  const phone = cleanPhone(from);
+  const referralCode = generateCode(phone);
+
+  const { data } = await supabase
+    .from("users")
+    .select("id, message_count")
+    .eq("phone", phone)
+    .single();
+
+  if (data) {
+    await supabase
+      .from("users")
+      .update({ message_count: data.message_count + 1 })
+      .eq("phone", phone);
+  } else {
+    const { error } = await supabase.from("users").insert({
+      telegram_id: null,
+      first_name: profileName || "WhatsApp User",
+      last_name: null,
+      username: null,
+      phone: phone,
+      language: "fr",
+      referral_code: referralCode,
+      referred_by: referredBy || null,
+      message_count: 1,
+    });
+    if (error) console.error("❌ Insert error:", error);
+    else {
+      console.log("✅ New WhatsApp user tracked:", phone);
+      // Track referral if referred
+      if (referredBy) {
+        const { data: referrer } = await supabase
+          .from("users")
+          .select("id, phone, first_name")
+          .eq("referral_code", referredBy)
+          .single();
+        if (referrer) {
+          await supabase.from("referrals").insert({
+            referrer_telegram_id: null,
+            referred_telegram_id: null,
+            referrer_phone: referrer.phone,
+            referred_phone: phone,
+          });
+          // Notify referrer on WhatsApp if they have a phone
+          if (referrer.phone) {
+            await sendWhatsAppMessage(
+              `whatsapp:${referrer.phone}`,
+              `🎉 *Nouveau supporter recruté !*\n\n${profileName || "Un ami"} a rejoint Thiès Ma Ville grâce à votre lien ! Jërejëf 🙏\n\nContinuez à partager ! 🏙️`
+            );
+          }
+        }
+      }
+    }
+  }
+}
+
+// ─── Send WhatsApp message via Twilio ────────────────────────────────────────
+async function sendWhatsAppMessage(to, body) {
+  const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  try {
+    await client.messages.create({
+      from: WHATSAPP_NUMBER,
+      to: to,
+      body: body,
+    });
+  } catch (err) {
+    console.error("❌ Twilio send error:", err);
+  }
+}
 
 // ─── System prompt ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are "Thies Maayo Agent" – the official AI campaign assistant for ALHOUSSEYNOU BA, candidate for Mayor of Thiès, Senegal in 2027.
-
-═══════════════════════════════════════
-PROFIL COMPLET DU CANDIDAT
-═══════════════════════════════════════
+const SYSTEM_PROMPT = `Tu es "Thies Ma Ville" — l'assistant officiel de la campagne d'ALHOUSSEYNOU BA, candidat à la Mairie de Thiès en 2027. Tu opères sur WhatsApp.
 
 NOM: Alhousseynou Ba
 SLOGAN: "Thiès 2027 : L'Audace de la Transformation"
-PARTI: FARLU (Forces Africaines pour la Renaissance, la Liberté et l'Unité)
-COALITION: Sénégal Uni
-SITE WEB OFFICIEL CAMPAGNE: alhousseynouba.com
-NUMÉRO WHATSAPP: +221 77 198 02 97
-
-═══════════════════════════════════════
-RÉSEAUX SOCIAUX FONDÉS PAR ALHOUSSEYNOU BA
-═══════════════════════════════════════
-
-1. 🌍 ONE-AFRICA.COM — Le 1er réseau social panafricain
-   Fondé par Alhousseynou Ba. Créé par des Africains, pour le monde entier.
-   Ce n'est PAS un site e-commerce — c'est un réseau social panafricain complet.
-   Mission: connecter les Africains et amis de l'Afrique à travers le monde.
-   App disponible sur iOS et Android.
-   Facebook: facebook.com/oneAfricanow (191,000+ abonnés)
-
-2. 🇸🇳 SENEGALUNI.COM — Le réseau social de la coalition Sénégal Uni
-   Fondé par Alhousseynou Ba pour unifier les Sénégalais au-delà des clivages.
-   Slogan: "Une Nation, Un Peuple, Un Avenir"
-   Fonctionnalités: groupes, forums, événements, sondages, petites annonces solidaires
-   Hashtags officiels: #Thiès2027 #AlhousseynouBa #MairieDeThiès #SénégalUni
-   App disponible sur iOS et Android.
-
-3. 🌐 SENEGALDIASPORA.COM — Le réseau pour unifier la diaspora sénégalaise
-   Fondé par Alhousseynou Ba pour connecter les Sénégalais de l'extérieur avec leur pays.
-   Services: accès aux ambassades, consulats, ressources juridiques, soutien psychologique.
-   Application mobile Senegal Diaspora Hub en cours de lancement.
-
-4. 🏙️ THIES.CITY — Le réseau social pour tous les Thiessois
-   Fondé par Alhousseynou Ba pour connecter et réseauter TOUS les Thiessois.
-   Fonctionnalités: photos, vidéos, groupes, emplois, événements, entreprises locales, forum, blogs, petites annonces, voyages, sondages, musique
-   Objectif: 10,000 membres actifs, doubler les lieux référencés d'ici 2026, créer 20 emplois locaux
-   La mémoire visuelle et numérique de Thiès.
-
-AUTRES RÉSEAUX:
-- 🎵 TikTok OFFICIEL: @alhousseynouba_officiel → tiktok.com/@alhousseynouba_officiel
-- 📸 Instagram OFFICIEL: @alhousseynou_ba_officiel → instagram.com/alhousseynou_ba_officiel
-- ▶️ YouTube OFFICIEL: youtube.com/@baalhousseynou/videos
-- 💼 LinkedIn: Alhousseynou Ba - One Africa
-- 📘 Facebook One Africa: facebook.com/oneAfricanow (191,000+ abonnés)
-- 🌐 Biographie complète: one-africa.com/document/biographie-de-al-housseynou-ba
-
-RÈGLE IMPORTANTE: Quand quelqu'un demande des infos sur Thiès → diriger vers thies.city
-Quand quelqu'un est de la diaspora → diriger vers senegaldiaspora.com
-Quand quelqu'un veut rejoindre le mouvement → diriger vers senegaluni.com
-Quand quelqu'un parle de l'Afrique en général → mentionner one-africa.com
+PARTI: FARLU | COALITION: Sénégal Uni | SITE: alhousseynouba.com | WA: +221 77 198 02 97
 
 QUI EST ALHOUSSEYNOU BA:
-- Fondateur et PDG de One Africa Group (plateforme panafricaine one-africa.com)
-- PDG de Ba Investment Group
-- Président du parti FARLU
-- Membre de la coalition Sénégal Uni
-- Nommé au Conseil Arabo-Africain pour la Sensibilisation (basé en Égypte)
-- Expert en technologies de l'information et gestion d'entreprise
-- Défenseur de l'intégration africaine et de la réduction de la fracture numérique
-- A participé à la rencontre entre la Ministre Yassine Fall et la diaspora sénégalaise au Caire
-- Créateur de l'application "Senegal Diaspora Hub" pour la diaspora sénégalaise
-- Il n'est PAS un politicien de carrière — il est un bâtisseur et entrepreneur
+- Fondateur PDG One Africa Group & Ba Investment Group
+- Fondateur 1er réseau social panafricain: one-africa.com
+- Président FARLU, nommé Conseil Arabo-Africain (Égypte)
+- Expert tech & entrepreneur — PAS un politicien de carrière
 
-SA VISION POUR THIÈS:
-"Gérer notre cité avec l'efficacité d'une entreprise et le cœur d'un patriote"
-"Thiès n'est pas une ville secondaire, c'est la future métropole d'équilibre du Sénégal"
+RÉSEAUX: one-africa.com | senegaluni.com | senegaldiaspora.com | thies.city | alhousseynouba.com
+YouTube: @baalhousseynou | Instagram: @alhousseynou_ba_officiel | TikTok: @alhousseynouba_officiel | Facebook: 191,000+ abonnés
 
-SES 3 ENGAGEMENTS PRINCIPAUX:
-1. MODERNISER les services municipaux (e-Mairie, digitalisation état civil, Wi-Fi public)
-2. DYNAMISER l'économie locale (10.000 emplois sur 3 ans, Ba Investment Network)
-3. UNIR toutes les forces vives de Thiès
+PROJET THIÈS:
+AXE 1 — GOUVERNANCE: Conseil des Sages, Budget Participatif 15%, Inclusion Totale
+AXE 2 — DIGITAL: E-Mairie, Wi-Fi Public gratuit
+AXE 3 — INTERNATIONAL: Jumelages USA/Égypte/Turquie, 10,000 emplois sur 3 ans
+AXE 4 — FONDS CITOYEN: Micro-crédits Jaango sans intérêts, investissement participatif
+AXE 5 — CADRE DE VIE: Pavage, Thiès Ville Verte, collecte déchets géolocalisée
 
-SON PROJET DÉTAILLÉ POUR THIÈS:
+5 SEMAINES DE THIÈS: Concorde | Tech Valley | Olympique | Rail & Culture | Business
 
-AXE 1 — GOUVERNANCE & UNITÉ CITOYENNE:
-- Conseil des Sages et des Quartiers: dialogue permanent avec délégués et notables
-- Budget Participatif: 15% du budget d'investissement choisi par les populations
-- Inclusion Totale: protection des vulnérables, accès aux services pour personnes handicapées
+TES FONCTIONS (détection automatique):
+1. TRADUCTION → français officiel + wolof marché + note vocale WhatsApp 30s
+2. ATTAQUE → 3 phrases factuelles et percutantes
+3. PROGRAMME → agenda optimisé par quartier (Cité Sonatel, Médina Fall, Nord, Est, Gare, Randoulène)
+4. PLAINTE → solution + budget CFA estimé + note vocale wolof 15s
 
-AXE 2 — THIÈS 100% DIGITALE (SMART CITY):
-- E-Mairie: digitalisation complète de l'État Civil (extraits de naissance, permis, taxes depuis smartphone)
-- Wi-Fi Public gratuit sur la Promenade des Thiessois et la Place de France
-- Administration zéro papier, zéro corruption, 100% rapide
+COMMANDES DISPONIBLES:
+- *rejoindre* → inscription bénévole
+- *inviter* → lien de recrutement personnel
+- *sondage* → donner son avis
+- *info* → infos sur Alhousseynou Ba
+- *plainte* → signaler un problème
+- *traduire* → traduire une politique
+- *attaque* → répondre à une attaque
+- *programme* → optimiser un agenda
 
-AXE 3 — OUVERTURE INTERNATIONALE & PARTENARIATS:
-- Jumelages économiques avec villes aux USA, Égypte, Turquie, Asie
-- Ba Investment Network: mobiliser partenaires Ghana, Nigeria, Botswana, Dubaï pour usines agro-alimentaires à Thiès
-- Diplomatie municipale pour transfert de compétences et équipements (camions bennes, bus scolaires)
+PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Salam aleykum, Waaw, Jërejëf.
+RÈGLES:
+- Réponses TOUJOURS sous 1500 caractères pour WhatsApp
+- Toujours spécifique à Thiès
+- Détection langue auto (arabe/anglais/français)
+- Pour Thiessois → thies.city | Diaspora → senegaldiaspora.com | Mouvement → senegaluni.com | Afrique → one-africa.com
+- Utiliser des emojis comme séparateurs de section`;
 
-AXE 4 — FONDS D'INVESTISSEMENT CITOYEN:
-- Modèle "Jaango" Municipal: fonds de garantie pour micro-crédits sans intérêts (femmes et jeunes)
-- Investissement Participatif: projets financés par l'épargne des Thiessois qui deviennent actionnaires
+// ─── Welcome message ──────────────────────────────────────────────────────────
+function welcomeMessage(name = "") {
+  const greeting = name ? `Salam aleykum ${name} !` : "Salam aleykum !";
+  return `🏙️ *Thies Ma Ville* — Agent Officiel de Campagne
 
-AXE 5 — CADRE DE VIE RÉNOVÉ:
-- Voirie & Mobilité: pavage massif des rues secondaires pour désenclaver quartiers périphériques
-- Thiès Ville Verte: parcs urbains, plantation d'arbres sur grandes avenues
-- Salubrité Intelligente: collecte déchets géolocalisée, valorisation en énergie/compost
+${greeting} Je suis l'assistant d'*Alhousseynou Ba*, candidat à la Mairie de Thiès 2027.
 
-LES 5 SEMAINES DE THIÈS (événements annuels):
-1. 🕌 Semaine de la Concorde (religieux): rassembler Mourides, Tidianes, Khadres, Layènes, Niassènes, Catholiques — Foire "Halal & Traditions"
-2. 💻 Semaine "Thiès Tech Valley" (technologie): Salon IA/Robotique/Agri-Tech, Hackathons étudiants, startups Silicon Valley/Nigeria/Égypte
-3. 🏃 Semaine Olympique & Marathon International de Thiès (sport): course homologuée, élites mondiales Kenya/Éthiopie/Europe
-4. 🎭 Semaine du Rail & de la Culture: Carnaval du Cayor, patrimoine cheminot, festivals musique/théâtre/artisanat
-5. 💼 Semaine Business & Investissement: Forum économique, partenaires USA/Dubaï/Ghana, PME thiessoises
+Tapez votre commande :
+1️⃣ *plainte* — Signaler un problème
+2️⃣ *traduire* — Traduire une politique
+3️⃣ *attaque* — Répondre à une attaque
+4️⃣ *programme* — Optimiser un agenda
+5️⃣ *info* — En savoir plus
+🔗 *inviter* — Votre lien de recrutement
+🤝 *rejoindre* — Rejoindre l'équipe
+🗳️ *sondage* — Donner votre avis
 
-OPPONENTS: ${CAMPAIGN.opponents}
-VOTERS' TOP ISSUE: ${CAMPAIGN.topIssue}
+🌐 alhousseynouba.com
+🏙️ thies.city | 🇸🇳 senegaluni.com
 
-═══════════════════════════════════════
-YOUR PERSONALITY & LANGUAGE
-═══════════════════════════════════════
-
-Respectful, energetic, pragmatic. Fluent in French and basic Wolof.
-Use Wolof naturally: Salam aleykum, Waaw, Jërejëf, "Ndank ndank mooy japp golo ci naaye", "Jëf jëf bu baax daay fey", "Nit nittay garabam"
-
-You understand Senegalese political culture:
-- Religious brotherhoods (Tidjane, Mouride) and their spiritual leaders
-- Transport union power at Gare Routière de Thiès
-- Student influence from Université Iba Der Thiam de Thiès
-- Market women networks (thioffoye)
-- Neighborhoods: Cité Sonatel, Médina Fall, Nord, Est, Gare area, Randoulène
-
-═══════════════════════════════════════
-YOUR FOUR MODES
-═══════════════════════════════════════
-
-1. POLICY TRANSLATION — when user shares a policy or says "traduire":
-   🇫🇷 FRANÇAIS OFFICIEL: [formal, for officials/press]
-   🗣️ WOLOF (marché/anciens): [colloquial, accessible]
-   📱 NOTE VOCALE WHATSAPP (30 sec): [warm, urgent, honest — reference real Thiès places]
-
-2. ATTACK REBUTTAL — when user describes an opponent attack:
-   ⚔️ RÉPONSE: 3 sentences, factual, non-insulting but damaging.
-   Always contrast with Alhousseynou's concrete plans (cite specific axes above).
-
-3. SCHEDULE OPTIMIZATION — "programme-moi X heures":
-   ⏰ Time | 📍 Location | 👤 Person to meet | 💬 2-minute talking point referencing real project
-
-4. VOTER COMPLAINT HANDLER — local problem described:
-   📋 SOLUTION POLITIQUE: paragraph + CFA budget estimate + reference to relevant AXE above
-   🎙️ NOTE VOCALE WOLOF (15 sec): script in Wolof
-   ⚔️ BILAN DE L'ADJOINT: rebuttal citing deputy mayor's failure
-
-RULES:
-- Always reference Alhousseynou's REAL projects and background — never generic
-- Mention One Africa Group, Ba Investment, FARLU, coalition Sénégal Uni when relevant
-- Thiessois → diriger vers thies.city | Diaspora → senegaldiaspora.com | Mouvement citoyen → senegaluni.com | Afrique en général → one-africa.com
-- Rappeler que one-africa.com est le 1er réseau social panafricain fondé par Alhousseynou Ba — PAS un site e-commerce
-- Pour voir les vidéos et discours → YouTube: youtube.com/@baalhousseynou/videos
-- Pour suivre la campagne en photos → Instagram: @alhousseynou_ba_officiel
-- Pour contenu court et viral → TikTok: @alhousseynouba_officiel
-- Biographie complète → one-africa.com/document/biographie-de-al-housseynou-ba
-- Keep responses under 1600 characters for WhatsApp
-- Use emojis as section headers
-- Press/journalists → formal French only
-- Staff → all 4 functions available
-- Voters → warm, Wolof-friendly, complaint handler mode`;
-
-
-// ─── Detect user role from message ───────────────────────────────────────────
-function detectRole(message) {
-  const msg = message.toLowerCase();
-  if (msg.includes("journalist") || msg.includes("presse") || msg.includes("journaliste")) return "press";
-  if (msg.includes("staff") || msg.includes("équipe") || msg.includes("equipe")) return "staff";
-  return "voter";
+_Waaw — écrivez votre message !_`;
 }
 
-// ─── Build welcome message ────────────────────────────────────────────────────
-function welcomeMessage() {
-  return `🗳️ *Thies Maayo Agent*
-Campagne de ${CAMPAIGN.candidate}
+// ─── Admin rapport ────────────────────────────────────────────────────────────
+async function buildRapport() {
+  const { data: users } = await supabase.from("users").select("*");
+  const { data: benevoles } = await supabase.from("benevoles").select("*");
+  const { data: votes } = await supabase.from("votes").select("*");
+  const { data: referrals } = await supabase.from("referrals").select("*");
 
-Salam aleykum! Comment puis-je vous aider?
+  const total = users?.length || 0;
+  const avecNumero = users?.filter((u) => u.phone).length || 0;
+  const totalBen = benevoles?.length || 0;
+  const totalVotes = votes?.length || 0;
+  const totalReferrals = referrals?.length || 0;
 
-Tapez:
-1️⃣ *plainte* – Signaler un problème dans votre quartier
-2️⃣ *politique* – Obtenir une traduction de politique
-3️⃣ *attaque* – Répondre à une attaque d'un opposant
-4️⃣ *programme* – Optimiser un agenda de campagne
-5️⃣ *presse* – Mode journaliste (français uniquement)
+  // Benevoles by quartier
+  const byQuartier = {};
+  benevoles?.forEach((b) => { byQuartier[b.quartier] = (byQuartier[b.quartier] || 0) + 1; });
+  const quartierText = Object.entries(byQuartier)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([q, n]) => `  • ${q}: ${n}`).join("\n") || "  Aucun encore";
 
-_Waaw — écrivez votre message et je répondrai immédiatement._`;
+  // Votes breakdown
+  const byReponse = {};
+  votes?.forEach((v) => { byReponse[v.reponse] = (byReponse[v.reponse] || 0) + 1; });
+  const votesText = Object.entries(byReponse)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([r, n]) => `  • ${r}: ${n}`).join("\n") || "  Aucun encore";
+
+  return `📊 *Rapport Campagne — Thiès 2027*
+_${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}_
+
+👥 *Supporters: ${total}*
+  • Avec numéro: ${avecNumero} (${total ? Math.round((avecNumero / total) * 100) : 0}%)
+  • Français: ${users?.filter((u) => u.language === "fr").length || 0}
+  • Anglais: ${users?.filter((u) => u.language === "en").length || 0}
+
+🤝 *Bénévoles: ${totalBen}*
+${quartierText}
+
+🗳️ *Votes: ${totalVotes}*
+${votesText}
+
+🔗 *Referrals: ${totalReferrals}*
+
+_Thiès 2027 : L'Audace de la Transformation !_ 🏙️`;
 }
+
+// ─── Weekly sondage ───────────────────────────────────────────────────────────
+const SONDAGES = [
+  { question: "Quel est votre problème principal à Thiès ?", choices: { "1": "Routes et pavage", "2": "Eau et électricité", "3": "Emploi et jeunesse", "4": "Santé et hôpital", "5": "Éducation et écoles" } },
+  { question: "Quel projet vous tient le plus à cœur ?", choices: { "1": "E-Mairie digitale", "2": "Wi-Fi public gratuit", "3": "10,000 emplois", "4": "Micro-crédits Jaango", "5": "Thiès Ville Verte" } },
+  { question: "Comment avez-vous entendu parler d'Alhousseynou Ba ?", choices: { "1": "Réseaux sociaux", "2": "Un ami / famille", "3": "Ce bot WhatsApp", "4": "Événement campagne", "5": "Médias / presse" } },
+];
+
+let currentSondageIndex = 0;
+
+async function sendWeeklySondage() {
+  const sondage = SONDAGES[currentSondageIndex % SONDAGES.length];
+  currentSondageIndex++;
+  const choicesText = Object.entries(sondage.choices).map(([k, v]) => `${k}️⃣ ${v}`).join("\n");
+  const message = `🗳️ *Sondage Hebdomadaire — Thiès 2027*\n\n*${sondage.question}*\n\n${choicesText}\n\n_Tapez le numéro de votre choix !_`;
+
+  const { data: users } = await supabase.from("users").select("phone").not("phone", "is", null);
+  if (!users) return;
+
+  let sent = 0;
+  for (const user of users) {
+    try {
+      await sendWhatsAppMessage(`whatsapp:${user.phone}`, message);
+      sent++;
+      await new Promise((r) => setTimeout(r, 100));
+    } catch (e) {}
+  }
+  console.log(`✅ Weekly sondage sent to ${sent} WhatsApp users`);
+}
+
+function scheduleWeeklySondage() {
+  const now = new Date();
+  const nextSunday = new Date();
+  nextSunday.setUTCHours(9, 0, 0, 0);
+  const daysUntilSunday = (7 - now.getUTCDay()) % 7 || 7;
+  nextSunday.setUTCDate(now.getUTCDate() + daysUntilSunday);
+  const msUntilNext = nextSunday - now;
+  console.log(`⏰ Next weekly sondage in ${Math.round(msUntilNext / 1000 / 60)} minutes`);
+  setTimeout(async () => {
+    await sendWeeklySondage();
+    setInterval(sendWeeklySondage, 7 * 24 * 60 * 60 * 1000);
+  }, msUntilNext);
+}
+
+// ─── Admin phone numbers ──────────────────────────────────────────────────────
+const ADMIN_PHONES = ["+221771980297"]; // Alhousseynou WhatsApp
 
 // ─── Main WhatsApp webhook ────────────────────────────────────────────────────
 app.post("/webhook", async (req, res) => {
@@ -225,27 +285,167 @@ app.post("/webhook", async (req, res) => {
   const response = new MessagingResponse();
 
   const incomingMsg = (req.body.Body || "").trim();
-  const from = req.body.From || "unknown";
+  const from = req.body.From || "unknown"; // "whatsapp:+221XXXXXXXXX"
+  const profileName = req.body.ProfileName || null;
+  const phone = cleanPhone(from);
 
   const session = getSession(from);
 
-  // Detect role if not set
-  if (!session.role) {
-    session.role = detectRole(incomingMsg);
-  }
+  // Track user
+  await trackWhatsAppUser(from, profileName, session.referredBy || null);
 
-  // Handle greetings / first contact
-  const greetings = ["bonjour", "salam", "hello", "hi", "salut", "start", "aide", "help"];
-  if (greetings.some((g) => incomingMsg.toLowerCase().startsWith(g)) && session.history.length === 0) {
-    response.message(welcomeMessage());
+  const msgLower = incomingMsg.toLowerCase();
+
+  // ── Welcome / greetings ───────────────────────────────────────────────────
+  const greetings = ["bonjour", "salam", "hello", "hi", "salut", "start", "aide", "help", "debut", "début"];
+  if (greetings.some((g) => msgLower.startsWith(g)) && session.history.length === 0) {
+    response.message(welcomeMessage(profileName));
     res.type("text/xml");
     return res.send(response.toString());
   }
 
-  // Add to history
-  session.history.push({ role: "user", content: incomingMsg });
+  // ── /inviter — referral link ──────────────────────────────────────────────
+  if (msgLower === "inviter" || msgLower === "invite" || msgLower === "lien") {
+    const code = generateCode(phone);
+    const { data: refs } = await supabase.from("referrals").select("id").eq("referrer_phone", phone);
+    const count = refs?.length || 0;
+    response.message(`🔗 *Votre lien de recrutement :*
 
-  // Keep last 10 exchanges to manage context
+https://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}
+
+Partagez ce lien avec vos amis et famille !
+
+📊 Vous avez recruté *${count} supporter(s)* jusqu'ici.
+
+_Ndank ndank mooy japp golo ci naaye !_ 🏙️`);
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Handle referral code in first message ─────────────────────────────────
+  if (msgLower.startsWith("tmv") && session.history.length === 0) {
+    session.referredBy = incomingMsg.trim();
+    await trackWhatsAppUser(from, profileName, session.referredBy);
+    response.message(welcomeMessage(profileName));
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Sondage command ───────────────────────────────────────────────────────
+  if (msgLower === "sondage") {
+    response.message(`🗳️ *Sondage Thiès 2027*
+
+Quel est votre problème principal à Thiès ?
+
+1️⃣ Routes et pavage
+2️⃣ Eau et électricité
+3️⃣ Emploi et jeunesse
+4️⃣ Santé et hôpital
+5️⃣ Éducation et écoles`);
+    session.awaitingSondage = true;
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Sondage response ──────────────────────────────────────────────────────
+  if (session.awaitingSondage && ["1", "2", "3", "4", "5"].includes(incomingMsg)) {
+    const reponses = { "1": "Routes et pavage", "2": "Eau et électricité", "3": "Emploi et jeunesse", "4": "Santé et hôpital", "5": "Éducation et écoles" };
+    await supabase.from("votes").insert({
+      telegram_id: null,
+      question: "Problème principal à Thiès",
+      reponse: reponses[incomingMsg],
+    });
+    session.awaitingSondage = false;
+    response.message(`✅ Merci pour votre vote ! Jërejëf 🙏\n\nVotre choix: *${reponses[incomingMsg]}*\n\n👉 Recrutez des supporters : tapez *inviter*`);
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Benevole flow ─────────────────────────────────────────────────────────
+  if (msgLower === "rejoindre" || msgLower === "benevole" || msgLower === "bénévole") {
+    session.benevole = { step: 1 };
+    response.message(`🤝 *Rejoindre l'équipe de campagne !*
+
+Waaw ! Jërejëf pour votre engagement 🙏
+
+*Question 1/2* — Quel est votre quartier à Thiès ?
+(Ex: Médina Fall, Randoulène, Cité Sonatel, Nord, Est, Gare...)`);
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  if (session.benevole) {
+    if (session.benevole.step === 1) {
+      session.benevole.quartier = incomingMsg;
+      session.benevole.step = 2;
+      response.message(`*Question 2/2* — Quelle est votre disponibilité ?
+
+1️⃣ Week-end seulement
+2️⃣ Soirs de semaine
+3️⃣ Temps plein`);
+      res.type("text/xml");
+      return res.send(response.toString());
+    }
+
+    if (session.benevole.step === 2) {
+      const { error } = await supabase.from("benevoles").insert({
+        telegram_id: null,
+        first_name: profileName || "WhatsApp User",
+        last_name: null,
+        quartier: session.benevole.quartier,
+        disponibilite: incomingMsg,
+        phone: phone,
+      });
+      if (error) console.error("❌ Benevole error:", error);
+      else console.log("✅ WhatsApp benevole inserted!");
+      session.benevole = null;
+      response.message(`✅ *Inscription confirmée !*
+
+Jërejëf ${profileName || ""} ! Tu fais partie de l'équipe Thiès 2027 ! 🏙️
+
+👉 Recrutez vos amis : tapez *inviter*
+
+*Ndank ndank mooy japp golo ci naaye !* 💪`);
+      res.type("text/xml");
+      return res.send(response.toString());
+    }
+  }
+
+  // ── Admin: rapport ────────────────────────────────────────────────────────
+  if (msgLower === "rapport" && ADMIN_PHONES.includes(phone)) {
+    const rapport = await buildRapport();
+    response.message(rapport);
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Admin: broadcast ──────────────────────────────────────────────────────
+  if (msgLower.startsWith("broadcast ") && ADMIN_PHONES.includes(phone)) {
+    const message = incomingMsg.replace(/^broadcast /i, "");
+    const { data: users } = await supabase.from("users").select("phone").not("phone", "is", null);
+    let envoye = 0;
+    for (const user of users || []) {
+      try {
+        await sendWhatsAppMessage(`whatsapp:${user.phone}`, `📢 *Message de campagne*\n\n${message}\n\n🏙️ _Alhousseynou Ba — Thiès 2027_`);
+        envoye++;
+        await new Promise((r) => setTimeout(r, 100));
+      } catch (e) {}
+    }
+    response.message(`✅ Message envoyé à ${envoye} supporters !`);
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Reset session ─────────────────────────────────────────────────────────
+  if (msgLower === "reset") {
+    sessions.delete(from);
+    response.message("✅ Conversation réinitialisée. Jërejëf !");
+    res.type("text/xml");
+    return res.send(response.toString());
+  }
+
+  // ── Claude AI response ────────────────────────────────────────────────────
+  session.history.push({ role: "user", content: incomingMsg });
   if (session.history.length > 20) {
     session.history = session.history.slice(-20);
   }
@@ -259,10 +459,8 @@ app.post("/webhook", async (req, res) => {
     });
 
     const reply = completion.content.map((b) => b.text || "").join("").trim();
-
     session.history.push({ role: "assistant", content: reply });
 
-    // WhatsApp has a 1600 char limit per message — split if needed
     if (reply.length > 1580) {
       const chunks = reply.match(/.{1,1580}(\s|$)/gs) || [reply];
       chunks.forEach((chunk) => response.message(chunk.trim()));
@@ -271,7 +469,7 @@ app.post("/webhook", async (req, res) => {
     }
   } catch (err) {
     console.error("Anthropic error:", err);
-    response.message("⚠️ Une erreur est survenue. Veuillez réessayer dans un moment. / Jërejëf, bañ ak solo bi.");
+    response.message("⚠️ Une erreur est survenue. Veuillez réessayer. / Jërejëf, bañ ak solo bi.");
   }
 
   res.type("text/xml");
@@ -282,20 +480,21 @@ app.post("/webhook", async (req, res) => {
 app.get("/", (req, res) => {
   res.json({
     status: "online",
-    agent: "Thies Maayo Agent",
-    candidate: CAMPAIGN.candidate,
+    agent: BOT_NAME,
     timestamp: new Date().toISOString(),
   });
 });
 
-// ─── Reset session (for testing) ──────────────────────────────────────────────
+// ─── Reset session endpoint ───────────────────────────────────────────────────
 app.post("/reset/:phone", (req, res) => {
   const phone = `whatsapp:+${req.params.phone}`;
   sessions.delete(phone);
   res.json({ reset: true, phone });
 });
 
+// ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🗳️  Thies Maayo Agent running on port ${PORT}`);
+  console.log(`🏙️ ${BOT_NAME} WhatsApp Bot running on port ${PORT}`);
+  scheduleWeeklySondage();
 });
