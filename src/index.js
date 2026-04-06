@@ -9,6 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import cors from "cors";
 
 dotenv.config();
 
@@ -17,7 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-
+app.use(cors());
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
