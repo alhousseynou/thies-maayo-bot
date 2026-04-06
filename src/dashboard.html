@@ -9,9 +9,10 @@
   :root {
     --green: #00c853;
     --green-dark: #007c2e;
-    --green-glow: #00c85322;
+    --green-glow: #00c85318;
     --gold: #ffd600;
     --red: #ff1744;
+    --blue: #2979ff;
     --bg: #050a05;
     --bg2: #0a120a;
     --bg3: #0f1f0f;
@@ -21,289 +22,137 @@
     --muted: #4a7a4a;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Outfit', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+  body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; min-height: 100vh; overflow-x: hidden; }
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(var(--border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    position: fixed; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
     background-size: 40px 40px;
-    opacity: 0.25;
-    pointer-events: none;
-    z-index: 0;
+    opacity: 0.2; pointer-events: none; z-index: 0;
   }
-  .container { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 16px; }
 
   /* Header */
-  header {
-    border-bottom: 2px solid var(--green);
-    padding-bottom: 20px;
-    margin-bottom: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .logo { display: flex; align-items: center; gap: 14px; }
-  .logo-icon {
-    width: 48px; height: 48px;
-    background: var(--green);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 24px;
-    box-shadow: 0 0 24px var(--green-glow);
-  }
-  .logo-text h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 26px;
-    color: var(--green);
-    letter-spacing: 2px;
-    line-height: 1;
-  }
-  .logo-text p {
-    font-size: 11px;
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
+  header { border-bottom: 2px solid var(--green); padding-bottom: 16px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 44px; height: 44px; background: var(--green); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 0 20px var(--green-glow); }
+  .logo-text h1 { font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: var(--green); letter-spacing: 2px; line-height: 1; }
+  .logo-text p { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 1px; }
   .header-right { text-align: right; }
-  .live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--green-glow);
-    border: 1px solid var(--green);
-    border-radius: 20px;
-    padding: 4px 12px;
-    font-size: 11px;
-    font-family: 'Space Mono', monospace;
-    color: var(--green);
-    margin-bottom: 6px;
-  }
-  .live-dot {
-    width: 7px; height: 7px;
-    background: var(--green);
-    border-radius: 50%;
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 #00c85355; }
-    50% { opacity: 0.5; box-shadow: 0 0 0 5px transparent; }
-  }
-  .last-updated { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
+  .live-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--green-glow); border: 1px solid var(--green); border-radius: 20px; padding: 4px 12px; font-size: 11px; font-family: 'Space Mono', monospace; color: var(--green); margin-bottom: 4px; }
+  .live-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 #00c85355}50%{opacity:.5;box-shadow:0 0 0 5px transparent} }
+  .last-updated { font-size: 10px; color: var(--muted); font-family: 'Space Mono', monospace; }
 
   /* Stats grid */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 14px;
-    margin-bottom: 24px;
-  }
-  .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 18px 16px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s, transform 0.2s;
-  }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 14px; position: relative; overflow: hidden; transition: border-color .3s, transform .2s; cursor: default; }
   .stat-card:hover { border-color: var(--green); transform: translateY(-2px); }
-  .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: var(--green);
-  }
-  .stat-card.gold::before { background: var(--gold); }
-  .stat-card.red::before { background: var(--red); }
-  .stat-card.blue::before { background: #2979ff; }
-  .stat-label {
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-family: 'Space Mono', monospace;
-    margin-bottom: 8px;
-  }
-  .stat-value {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 44px;
-    color: var(--green);
-    line-height: 1;
-  }
-  .stat-card.gold .stat-value { color: var(--gold); }
-  .stat-card.red .stat-value { color: var(--red); }
-  .stat-card.blue .stat-value { color: #2979ff; }
-  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--green); }
+  .stat-card.gold::before { background:var(--gold); }
+  .stat-card.red::before { background:var(--red); }
+  .stat-card.blue::before { background:var(--blue); }
+  .stat-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; font-family:'Space Mono',monospace; margin-bottom:6px; }
+  .stat-value { font-family:'Bebas Neue',sans-serif; font-size:42px; color:var(--green); line-height:1; }
+  .stat-card.gold .stat-value { color:var(--gold); }
+  .stat-card.red .stat-value { color:var(--red); }
+  .stat-card.blue .stat-value { color:var(--blue); }
+  .stat-sub { font-size:11px; color:var(--muted); margin-top:4px; }
 
-  /* Sections */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+  /* Grid layouts */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
+  @media(max-width:768px) { .grid-2,.grid-3 { grid-template-columns:1fr; } }
 
-  .section {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 16px;
-  }
-  .section-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 18px;
-    letter-spacing: 2px;
-    color: var(--green);
-    margin-bottom: 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  /* Section */
+  .section { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:16px; }
+  .section-title { font-family:'Bebas Neue',sans-serif; font-size:17px; letter-spacing:2px; color:var(--green); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+
+  /* Coverage bar */
+  .coverage-bar { height:12px; background:var(--bg3); border-radius:6px; overflow:hidden; margin:10px 0 6px; }
+  .coverage-fill { height:100%; background:linear-gradient(90deg,var(--green-dark),var(--green)); border-radius:6px; width:0; transition:width 1.4s ease; }
+  .coverage-labels { display:flex; justify-content:space-between; font-size:11px; }
+  .coverage-labels span:first-child { color:var(--green); font-family:'Space Mono',monospace; }
+  .coverage-labels span:last-child { color:var(--muted); font-family:'Space Mono',monospace; }
 
   /* Language bars */
-  .lang-bars { display: flex; flex-direction: column; gap: 14px; }
-  .lang-row { display: flex; align-items: center; gap: 10px; }
-  .lang-name { width: 70px; font-size: 12px; color: var(--text); font-family: 'Space Mono', monospace; }
-  .lang-bar-bg { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
-  .lang-bar-fill { height: 100%; background: var(--green); border-radius: 4px; width: 0; transition: width 1.2s ease; }
-  .lang-count { width: 36px; text-align: right; font-size: 12px; font-family: 'Space Mono', monospace; color: var(--muted); }
+  .lang-bars { display:flex; flex-direction:column; gap:12px; }
+  .lang-row { display:flex; align-items:center; gap:10px; }
+  .lang-flag { font-size:18px; width:28px; text-align:center; }
+  .lang-name { width:28px; font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; }
+  .lang-bar-bg { flex:1; height:8px; background:var(--bg3); border-radius:4px; overflow:hidden; }
+  .lang-bar-fill { height:100%; background:var(--green); border-radius:4px; width:0; transition:width 1.2s ease; }
+  .lang-count { width:32px; text-align:right; font-size:12px; font-family:'Space Mono',monospace; color:var(--muted); }
 
-  /* Votes */
-  .votes-list { display: flex; flex-direction: column; gap: 14px; }
-  .vote-row { display: flex; flex-direction: column; gap: 6px; }
-  .vote-label { display: flex; justify-content: space-between; font-size: 13px; }
-  .vote-label .vl-name { color: var(--text); }
-  .vote-label .vl-count { color: var(--green); font-family: 'Space Mono', monospace; font-weight: 700; }
-  .vote-bar-bg { height: 9px; background: var(--bg3); border-radius: 5px; overflow: hidden; }
-  .vote-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green-dark), var(--green)); border-radius: 5px; width: 0; transition: width 1.3s ease; }
+  /* Votes / Pie chart */
+  .votes-container { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+  .pie-wrapper { position:relative; width:140px; height:140px; flex-shrink:0; }
+  canvas.pie { width:140px!important; height:140px!important; }
+  .votes-legend { flex:1; display:flex; flex-direction:column; gap:10px; }
+  .vote-row { display:flex; flex-direction:column; gap:4px; }
+  .vote-label { display:flex; justify-content:space-between; font-size:12px; }
+  .vote-label .vl-name { color:var(--text); display:flex; align-items:center; gap:6px; }
+  .vote-label .vl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .vote-label .vl-count { color:var(--green); font-family:'Space Mono',monospace; font-weight:700; font-size:11px; }
+  .vote-bar-bg { height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+  .vote-bar-fill { height:100%; border-radius:3px; width:0; transition:width 1.3s ease; }
 
-  /* Quartiers */
-  .quartier-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
-  .quartier-card {
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 14px 10px;
-    text-align: center;
-    transition: border-color 0.2s, transform 0.2s;
-  }
-  .quartier-card:hover { border-color: var(--green); transform: translateY(-2px); }
-  .quartier-count { font-family: 'Bebas Neue', sans-serif; font-size: 34px; color: var(--green); line-height: 1; }
-  .quartier-name { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  /* Map of Thiès quartiers */
+  .map-container { position:relative; background:var(--bg3); border-radius:8px; overflow:hidden; min-height:280px; }
+  .map-svg { width:100%; height:280px; }
+  .quartier-zone { cursor:pointer; transition:opacity .2s; }
+  .quartier-zone:hover { opacity:.8; }
+  .quartier-label { font-family:'Space Mono',monospace; font-size:9px; fill:var(--text); text-anchor:middle; pointer-events:none; }
+  .quartier-count-label { font-family:'Bebas Neue',sans-serif; font-size:14px; fill:white; text-anchor:middle; pointer-events:none; }
+  .map-legend { display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; }
+  .map-legend-item { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); }
+  .map-legend-dot { width:10px; height:10px; border-radius:2px; }
+
+  /* Quartier grid */
+  .quartier-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:10px; }
+  .quartier-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:12px 10px; text-align:center; transition:border-color .2s, transform .2s; cursor:default; }
+  .quartier-card:hover { border-color:var(--green); transform:translateY(-2px); }
+  .quartier-count { font-family:'Bebas Neue',sans-serif; font-size:32px; color:var(--green); line-height:1; }
+  .quartier-name { font-size:10px; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
 
   /* Referrals */
-  .ref-list { display: flex; flex-direction: column; gap: 8px; }
-  .ref-row {
-    display: flex;
-    align-items: center;
-    padding: 12px 14px;
-    background: var(--bg3);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    gap: 10px;
-  }
-  .ref-rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--muted); width: 28px; }
-  .ref-rank.top { color: var(--gold); }
-  .ref-name { font-size: 14px; font-weight: 600; flex: 1; }
-  .ref-badge {
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    color: var(--green);
-    background: var(--green-glow);
-    border: 1px solid var(--green);
-    border-radius: 20px;
-    padding: 3px 10px;
-  }
+  .ref-list { display:flex; flex-direction:column; gap:8px; }
+  .ref-row { display:flex; align-items:center; padding:10px 12px; background:var(--bg3); border-radius:8px; border:1px solid var(--border); gap:10px; }
+  .ref-rank { font-family:'Bebas Neue',sans-serif; font-size:20px; color:var(--muted); width:26px; }
+  .ref-rank.top { color:var(--gold); }
+  .ref-name { font-size:13px; font-weight:600; flex:1; }
+  .ref-badge { font-family:'Space Mono',monospace; font-size:11px; color:var(--green); background:var(--green-glow); border:1px solid var(--green); border-radius:20px; padding:3px 10px; }
 
   /* Benevoles table */
-  .table-wrapper { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th {
-    text-align: left;
-    padding: 10px 12px;
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    border-bottom: 1px solid var(--border);
-  }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
-  tr:hover td { background: var(--bg3); }
-  tr:last-child td { border-bottom: none; }
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-family: 'Space Mono', monospace;
-  }
-  .badge-green { background: var(--green-glow); color: var(--green); border: 1px solid var(--green); }
-  .badge-gold { background: #ffd60011; color: var(--gold); border: 1px solid var(--gold); }
-  .badge-muted { background: #ffffff08; color: var(--muted); border: 1px solid var(--border); }
+  .filter-bar { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .filter-btn { background:var(--bg3); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:12px; color:var(--muted); cursor:pointer; font-family:'Space Mono',monospace; transition:all .2s; }
+  .filter-btn.active { background:var(--green-glow); border-color:var(--green); color:var(--green); }
+  .filter-btn:hover { border-color:var(--green); color:var(--green); }
+  .table-wrapper { overflow-x:auto; max-height:300px; overflow-y:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th { text-align:left; padding:8px 10px; color:var(--muted); font-family:'Space Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--card); }
+  td { padding:9px 10px; border-bottom:1px solid var(--border); color:var(--text); }
+  tr:hover td { background:var(--bg3); }
+  tr:last-child td { border-bottom:none; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-family:'Space Mono',monospace; }
+  .badge-green { background:var(--green-glow); color:var(--green); border:1px solid var(--green); }
+  .badge-gold { background:#ffd60011; color:var(--gold); border:1px solid var(--gold); }
+  .badge-muted { background:#ffffff08; color:var(--muted); border:1px solid var(--border); }
+  .badge-blue { background:#2979ff11; color:var(--blue); border:1px solid var(--blue); }
 
-  /* Phone coverage */
-  .coverage-bar {
-    height: 14px;
-    background: var(--bg3);
-    border-radius: 7px;
-    overflow: hidden;
-    margin: 12px 0 8px;
-  }
-  .coverage-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--green-dark), var(--green));
-    border-radius: 7px;
-    width: 0;
-    transition: width 1.4s ease;
-  }
-  .coverage-labels { display: flex; justify-content: space-between; font-size: 12px; }
-  .coverage-labels span:first-child { color: var(--green); font-family: 'Space Mono', monospace; }
-  .coverage-labels span:last-child { color: var(--muted); font-family: 'Space Mono', monospace; }
-
-  /* Loading */
-  .loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 200px;
-    flex-direction: column;
-    gap: 16px;
-  }
-  .spinner {
-    width: 40px; height: 40px;
-    border: 3px solid var(--border);
-    border-top-color: var(--green);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading p { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 12px; }
-
-  /* Empty state */
-  .empty { color: var(--muted); font-size: 13px; font-style: italic; padding: 20px 0; text-align: center; }
+  /* Scoring */
+  .score-bar-bg { height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; margin-top:3px; }
+  .score-bar-fill { height:100%; background:linear-gradient(90deg,var(--green-dark),var(--green)); border-radius:3px; width:0; transition:width 1s ease; }
 
   /* Footer */
-  footer {
-    text-align: center;
-    padding: 30px 0 20px;
-    font-size: 11px;
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    border-top: 1px solid var(--border);
-    margin-top: 20px;
-  }
-  footer a { color: var(--green); text-decoration: none; }
+  footer { text-align:center; padding:24px 0 16px; font-size:10px; color:var(--muted); font-family:'Space Mono',monospace; border-top:1px solid var(--border); margin-top:20px; }
+  footer a { color:var(--green); text-decoration:none; }
+
+  /* Loading */
+  .loading { display:flex; align-items:center; justify-content:center; height:200px; flex-direction:column; gap:16px; }
+  .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty { color:var(--muted); font-size:12px; font-style:italic; padding:16px 0; text-align:center; }
 </style>
 </head>
 <body>
@@ -323,247 +172,403 @@
   </header>
 
   <div id="app">
-    <div class="loading">
-      <div class="spinner"></div>
-      <p>Chargement des données...</p>
-    </div>
+    <div class="loading"><div class="spinner"></div><p style="color:var(--muted);font-family:'Space Mono',monospace;font-size:11px">Chargement des données...</p></div>
   </div>
 </div>
 
 <script>
-  async function fetchData() {
-    const res = await fetch('/api/stats');
-    if (!res.ok) throw new Error('API error');
-    return res.json();
-  }
+const VOTE_COLORS = ['#00c853','#ffd600','#2979ff','#ff1744','#ff6d00'];
 
-  function pct(a, b) { return b ? Math.round((a / b) * 100) : 0; }
+async function fetchData() {
+  const res = await fetch('/api/stats');
+  if (!res.ok) throw new Error('API error');
+  return res.json();
+}
 
-  function disponibiliteLabel(d) {
-    if (!d) return '';
-    if (d.includes('1') || d.toLowerCase().includes('week')) return 'Week-end';
-    if (d.includes('2') || d.toLowerCase().includes('soir')) return 'Soirs';
-    if (d.includes('3') || d.toLowerCase().includes('plein')) return 'Temps plein';
-    return d;
-  }
+function pct(a, b) { return b ? Math.round((a / b) * 100) : 0; }
 
-  function disponibiliteBadge(d) {
-    const label = disponibiliteLabel(d);
-    if (label === 'Temps plein') return `<span class="badge badge-green">${label}</span>`;
-    if (label === 'Soirs') return `<span class="badge badge-gold">${label}</span>`;
-    return `<span class="badge badge-muted">${label}</span>`;
-  }
+function scoreSupporter(user, benevoles, votes, referrals) {
+  let score = 0;
+  if (user.phone) score += 20;
+  if (benevoles?.find(b => b.telegram_id === user.telegram_id)) score += 30;
+  if (votes?.find(v => v.telegram_id === user.telegram_id)) score += 20;
+  if (referrals?.find(r => r.referrer_telegram_id === user.telegram_id)) score += 30;
+  return score;
+}
 
-  function render(data) {
-    const { users, benevoles, votes, referrals } = data;
+function scoreLabel(score) {
+  if (score >= 80) return ['Champion', 'badge-green'];
+  if (score >= 50) return ['Actif', 'badge-blue'];
+  if (score >= 20) return ['Engagé', 'badge-gold'];
+  return ['Nouveau', 'badge-muted'];
+}
 
-    const total = users.length;
-    const avecNumero = users.filter(u => u.phone).length;
-    const totalBen = benevoles.length;
-    const totalVotes = votes.length;
-    const totalRefs = referrals.length;
+function disponibiliteLabel(d) {
+  if (!d) return '';
+  if (d.includes('1') || d.toLowerCase().includes('week')) return ['Week-end', 'badge-muted'];
+  if (d.includes('2') || d.toLowerCase().includes('soir')) return ['Soirs', 'badge-gold'];
+  if (d.includes('3') || d.toLowerCase().includes('plein')) return ['Temps plein', 'badge-green'];
+  return [d, 'badge-muted'];
+}
 
-    // Language counts
-    const langs = {};
-    users.forEach(u => { langs[u.language] = (langs[u.language] || 0) + 1; });
-    const langList = Object.entries(langs).sort((a, b) => b[1] - a[1]);
+function drawPie(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (!total) return;
+  let startAngle = -Math.PI / 2;
+  const cx = canvas.width / 2, cy = canvas.height / 2, r = Math.min(cx, cy) - 8;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  data.forEach((d, i) => {
+    const slice = (d.value / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + slice);
+    ctx.closePath();
+    ctx.fillStyle = d.color;
+    ctx.fill();
+    startAngle += slice;
+  });
+  // Center hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.55, 0, 2 * Math.PI);
+  ctx.fillStyle = '#0d1a0d';
+  ctx.fill();
+  // Center text
+  ctx.fillStyle = '#00c853';
+  ctx.font = 'bold 22px Bebas Neue';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(total, cx, cy);
+}
 
-    // Votes breakdown
-    const voteMap = {};
-    votes.forEach(v => { voteMap[v.reponse] = (voteMap[v.reponse] || 0) + 1; });
-    const voteList = Object.entries(voteMap).sort((a, b) => b[1] - a[1]);
-    const maxVotes = voteList[0]?.[1] || 1;
+// Thiès quartiers map (SVG-based schematic)
+function buildMap(quartierMap) {
+  const quartiers = [
+    { name: 'Nguinth', x: 200, y: 80, w: 120, h: 70 },
+    { name: 'Médina Fall', x: 80, y: 140, w: 130, h: 70 },
+    { name: 'Cité Sonatel', x: 310, y: 140, w: 130, h: 70 },
+    { name: 'Nord', x: 80, y: 200, w: 130, h: 70 },
+    { name: 'Est', x: 310, y: 200, w: 130, h: 70 },
+    { name: 'Gare', x: 185, y: 200, w: 130, h: 70 },
+    { name: 'Randoulène', x: 185, y: 260, w: 130, h: 70 },
+    { name: 'Diakhao-Thialy', x: 80, y: 260, w: 110, h: 70 },
+  ];
 
-    // Quartiers
-    const quartierMap = {};
-    benevoles.forEach(b => { quartierMap[b.quartier] = (quartierMap[b.quartier] || 0) + 1; });
-    const quartierList = Object.entries(quartierMap).sort((a, b) => b[1] - a[1]);
+  const maxCount = Math.max(...quartiers.map(q => quartierMap[q.name] || 0), 1);
 
-    // Top referrers
-    const refMap = {};
-    referrals.forEach(r => {
-      const key = r.referrer_telegram_id || r.referrer_phone || 'unknown';
-      refMap[key] = (refMap[key] || 0) + 1;
-    });
-    const topRefs = Object.entries(refMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key, count]) => {
-      const u = users.find(u => String(u.telegram_id) === String(key) || u.phone === key);
-      return { name: u ? `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}` : key, count };
-    });
+  const zones = quartiers.map(q => {
+    const count = quartierMap[q.name] || 0;
+    const intensity = count / maxCount;
+    const r = Math.round(0 + intensity * 0);
+    const g = Math.round(80 + intensity * 120);
+    const b = Math.round(46 + intensity * 0);
+    const color = count > 0 ? `rgb(${r},${g},${b})` : '#0f1f0f';
+    const border = count > 0 ? '#00c853' : '#1a3a1a';
+    return `
+      <rect x="${q.x}" y="${q.y}" width="${q.w}" height="${q.h}" rx="8" fill="${color}" stroke="${border}" stroke-width="1.5" class="quartier-zone"/>
+      <text x="${q.x + q.w/2}" y="${q.y + q.h/2 - 8}" class="quartier-count-label">${count > 0 ? count : ''}</text>
+      <text x="${q.x + q.w/2}" y="${q.y + q.h/2 + 10}" class="quartier-label">${q.name}</text>
+    `;
+  }).join('');
 
-    document.getElementById('lastUpdated').textContent = 'Mis à jour: ' + new Date().toLocaleTimeString('fr-FR');
+  return `<svg class="map-svg" viewBox="0 0 520 360" xmlns="http://www.w3.org/2000/svg">
+    <rect width="520" height="360" fill="#0a120a" rx="8"/>
+    <text x="260" y="30" font-family="Bebas Neue" font-size="16" fill="#4a7a4a" text-anchor="middle" letter-spacing="3">CARTE DES BÉNÉVOLES — THIÈS</text>
+    ${zones}
+    <text x="260" y="345" font-family="Space Mono" font-size="8" fill="#4a7a4a" text-anchor="middle">Intensité = nombre de bénévoles par quartier</text>
+  </svg>`;
+}
 
-    document.getElementById('app').innerHTML = `
-      <!-- KPI Stats -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">Supporters</div>
-          <div class="stat-value">${total}</div>
-          <div class="stat-sub">Total inscrits</div>
-        </div>
-        <div class="stat-card gold">
-          <div class="stat-label">Bénévoles</div>
-          <div class="stat-value">${totalBen}</div>
-          <div class="stat-sub">Équipe terrain</div>
-        </div>
-        <div class="stat-card red">
-          <div class="stat-label">Votes</div>
-          <div class="stat-value">${totalVotes}</div>
-          <div class="stat-sub">Sondages</div>
-        </div>
-        <div class="stat-card blue">
-          <div class="stat-label">Referrals</div>
-          <div class="stat-value">${totalRefs}</div>
-          <div class="stat-sub">Recrutements</div>
-        </div>
+let allBenevoles = [];
+let activeFilter = 'Tous';
+
+function filterBenevoles(filter) {
+  activeFilter = filter;
+  const filtered = filter === 'Tous' ? allBenevoles : allBenevoles.filter(b => b.quartier === filter);
+  document.getElementById('benevoles-tbody').innerHTML = filtered.length === 0
+    ? '<tr><td colspan="5" class="empty">Aucun bénévole trouvé</td></tr>'
+    : filtered.slice().reverse().map(b => {
+        const [dispLabel, dispClass] = disponibiliteLabel(b.disponibilite);
+        const hasPhone = b.phone ? '✅' : '—';
+        return `<tr>
+          <td>${b.first_name}${b.last_name ? ' ' + b.last_name : ''}</td>
+          <td>${b.quartier || '—'}</td>
+          <td><span class="badge ${dispClass}">${dispLabel}</span></td>
+          <td>${hasPhone}</td>
+          <td>${b.created_at ? new Date(b.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+        </tr>`;
+      }).join('');
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+}
+
+function render(data) {
+  const { users, benevoles, votes, referrals } = data;
+  allBenevoles = benevoles;
+
+  const total = users.length;
+  const avecNumero = users.filter(u => u.phone).length;
+  const totalBen = benevoles.length;
+  const totalVotes = votes.length;
+  const totalRefs = referrals.length;
+
+  // Languages
+  const langs = {};
+  users.forEach(u => { langs[u.language] = (langs[u.language] || 0) + 1; });
+  const langList = Object.entries(langs).sort((a, b) => b[1] - a[1]);
+  const langFlags = { fr: '🇫🇷', en: '🇺🇸', ar: '🇸🇦', unknown: '🌍' };
+
+  // Votes
+  const voteMap = {};
+  votes.forEach(v => { voteMap[v.reponse] = (voteMap[v.reponse] || 0) + 1; });
+  const voteList = Object.entries(voteMap).sort((a, b) => b[1] - a[1]);
+  const maxVotes = voteList[0]?.[1] || 1;
+
+  // Quartiers (from benevoles)
+  const quartierMap = {};
+  benevoles.forEach(b => { if (b.quartier) quartierMap[b.quartier] = (quartierMap[b.quartier] || 0) + 1; });
+  const quartierList = Object.entries(quartierMap).sort((a, b) => b[1] - a[1]);
+
+  // Top referrers
+  const refMap = {};
+  referrals.forEach(r => {
+    const key = r.referrer_telegram_id || r.referrer_phone || 'unknown';
+    refMap[key] = (refMap[key] || 0) + 1;
+  });
+  const topRefs = Object.entries(refMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key, count]) => {
+    const u = users.find(u => String(u.telegram_id) === String(key) || u.phone === key);
+    return { name: u ? `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}` : key, count };
+  });
+
+  // Scoring
+  const scoredUsers = users.map(u => ({
+    ...u,
+    score: scoreSupporter(u, benevoles, votes, referrals)
+  })).sort((a, b) => b.score - a.score);
+
+  // Quartier filters
+  const uniqueQuartiers = ['Tous', ...new Set(benevoles.map(b => b.quartier).filter(Boolean))];
+
+  document.getElementById('lastUpdated').textContent = 'Mis à jour: ' + new Date().toLocaleTimeString('fr-FR');
+
+  document.getElementById('app').innerHTML = `
+    <!-- KPI Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Supporters</div>
+        <div class="stat-value">${total}</div>
+        <div class="stat-sub">Total inscrits</div>
       </div>
+      <div class="stat-card gold">
+        <div class="stat-label">Bénévoles</div>
+        <div class="stat-value">${totalBen}</div>
+        <div class="stat-sub">Équipe terrain</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Votes</div>
+        <div class="stat-value">${totalVotes}</div>
+        <div class="stat-sub">Sondages</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Referrals</div>
+        <div class="stat-value">${totalRefs}</div>
+        <div class="stat-sub">Recrutements</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Numéros</div>
+        <div class="stat-value">${pct(avecNumero, total)}%</div>
+        <div class="stat-sub">${avecNumero}/${total} collectés</div>
+      </div>
+    </div>
 
-      <!-- Phone coverage -->
+    <!-- Phone coverage -->
+    <div class="section">
+      <div class="section-title"><span>📱</span> Couverture Numéros</div>
+      <div class="coverage-bar"><div class="coverage-fill" id="coverageFill"></div></div>
+      <div class="coverage-labels">
+        <span>${avecNumero} avec numéro (${pct(avecNumero, total)}%)</span>
+        <span>${total - avecNumero} sans numéro</span>
+      </div>
+    </div>
+
+    <!-- Map + Votes -->
+    <div class="grid-2">
       <div class="section">
-        <div class="section-title"><span>📱</span> Couverture Numéros</div>
-        <div class="coverage-bar">
-          <div class="coverage-fill" id="coverageFill"></div>
+        <div class="section-title"><span>🗺️</span> Carte des Bénévoles</div>
+        <div class="map-container" id="mapContainer">
+          ${buildMap(quartierMap)}
         </div>
-        <div class="coverage-labels">
-          <span>${avecNumero} avec numéro (${pct(avecNumero, total)}%)</span>
-          <span>${total - avecNumero} sans numéro</span>
-        </div>
-      </div>
-
-      <!-- Languages + Votes -->
-      <div class="grid-2">
-        <div class="section">
-          <div class="section-title"><span>🌍</span> Langues</div>
-          <div class="lang-bars" id="langBars">
-            ${langList.length === 0 ? '<div class="empty">Aucune donnée</div>' :
-              langList.map(([lang, count]) => `
-                <div class="lang-row">
-                  <div class="lang-name">${lang === 'fr' ? '🇫🇷 FR' : lang === 'en' ? '🇺🇸 EN' : lang === 'ar' ? '🇸🇦 AR' : lang.toUpperCase()}</div>
-                  <div class="lang-bar-bg"><div class="lang-bar-fill" data-w="${pct(count, total)}"></div></div>
-                  <div class="lang-count">${count}</div>
-                </div>
-              `).join('')
-            }
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title"><span>🗳️</span> Résultats Sondage</div>
-          <div class="votes-list">
-            ${voteList.length === 0 ? '<div class="empty">Aucun vote encore</div>' :
-              voteList.map(([reponse, count]) => `
-                <div class="vote-row">
-                  <div class="vote-label">
-                    <span class="vl-name">${reponse}</span>
-                    <span class="vl-count">${count}</span>
-                  </div>
-                  <div class="vote-bar-bg"><div class="vote-bar-fill" data-w="${pct(count, maxVotes)}"></div></div>
-                </div>
-              `).join('')
-            }
-          </div>
+        <div class="map-legend" style="margin-top:10px">
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#007c2e"></div> Faible</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#00c853"></div> Fort</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#0f1f0f;border:1px solid #1a3a1a"></div> Vide</div>
         </div>
       </div>
 
-      <!-- Quartiers -->
       <div class="section">
-        <div class="section-title"><span>🗺️</span> Bénévoles par Quartier</div>
-        ${quartierList.length === 0
-          ? '<div class="empty">Aucun bénévole encore</div>'
-          : `<div class="quartier-grid">
-              ${quartierList.map(([q, n]) => `
-                <div class="quartier-card">
-                  <div class="quartier-count">${n}</div>
-                  <div class="quartier-name">${q}</div>
+        <div class="section-title"><span>🗳️</span> Résultats Sondage</div>
+        ${voteList.length === 0 ? '<div class="empty">Aucun vote encore</div>' : `
+        <div class="votes-container">
+          <div class="pie-wrapper">
+            <canvas id="votesPie" width="140" height="140" class="pie"></canvas>
+          </div>
+          <div class="votes-legend">
+            ${voteList.map((([r, count], i) => `
+              <div class="vote-row">
+                <div class="vote-label">
+                  <span class="vl-name"><span class="vl-dot" style="background:${VOTE_COLORS[i % VOTE_COLORS.length]}"></span>${r}</span>
+                  <span class="vl-count">${count}</span>
                 </div>
-              `).join('')}
-            </div>`
+                <div class="vote-bar-bg"><div class="vote-bar-fill" data-w="${pct(count, maxVotes)}" style="background:${VOTE_COLORS[i % VOTE_COLORS.length]}"></div></div>
+              </div>
+            `)).join('')}
+          </div>
+        </div>`}
+      </div>
+    </div>
+
+    <!-- Languages + Quartier counts -->
+    <div class="grid-2">
+      <div class="section">
+        <div class="section-title"><span>🌍</span> Langues</div>
+        <div class="lang-bars">
+          ${langList.length === 0 ? '<div class="empty">Aucune donnée</div>' :
+            langList.map(([lang, count]) => `
+              <div class="lang-row">
+                <div class="lang-flag">${langFlags[lang] || '🌍'}</div>
+                <div class="lang-name">${lang.toUpperCase()}</div>
+                <div class="lang-bar-bg"><div class="lang-bar-fill" data-w="${pct(count, total)}"></div></div>
+                <div class="lang-count">${count}</div>
+              </div>
+            `).join('')
+          }
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span>📍</span> Bénévoles par Quartier</div>
+        ${quartierList.length === 0 ? '<div class="empty">Aucun bénévole encore</div>' :
+          `<div class="quartier-grid">
+            ${quartierList.map(([q, n]) => `
+              <div class="quartier-card">
+                <div class="quartier-count">${n}</div>
+                <div class="quartier-name">${q}</div>
+              </div>
+            `).join('')}
+          </div>`
         }
       </div>
+    </div>
 
-      <!-- Top Referrers + Benevoles -->
-      <div class="grid-2">
-        <div class="section">
-          <div class="section-title"><span>🔗</span> Top Recruteurs</div>
-          <div class="ref-list">
-            ${topRefs.length === 0
-              ? '<div class="empty">Aucun recrutement encore</div>'
-              : topRefs.map((r, i) => `
-                <div class="ref-row">
-                  <div class="ref-rank ${i === 0 ? 'top' : ''}">${i + 1}</div>
-                  <div class="ref-name">${r.name}</div>
-                  <div class="ref-badge">${r.count} recruté${r.count > 1 ? 's' : ''}</div>
-                </div>
-              `).join('')
-            }
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title"><span>🤝</span> Derniers Bénévoles</div>
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Nom</th>
-                  <th>Quartier</th>
-                  <th>Dispo</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${benevoles.length === 0
-                  ? '<tr><td colspan="3" class="empty">Aucun bénévole</td></tr>'
-                  : benevoles.slice(-10).reverse().map(b => `
-                    <tr>
-                      <td>${b.first_name}${b.last_name ? ' ' + b.last_name : ''}</td>
-                      <td>${b.quartier || '—'}</td>
-                      <td>${disponibiliteBadge(b.disponibilite)}</td>
-                    </tr>
-                  `).join('')
-                }
-              </tbody>
-            </table>
-          </div>
+    <!-- Top Referrers + Scoring -->
+    <div class="grid-2">
+      <div class="section">
+        <div class="section-title"><span>🔗</span> Top Recruteurs</div>
+        <div class="ref-list">
+          ${topRefs.length === 0 ? '<div class="empty">Aucun recrutement encore</div>' :
+            topRefs.map((r, i) => `
+              <div class="ref-row">
+                <div class="ref-rank ${i === 0 ? 'top' : ''}">${i + 1}</div>
+                <div class="ref-name">${r.name}</div>
+                <div class="ref-badge">${r.count} recruté${r.count > 1 ? 's' : ''}</div>
+              </div>
+            `).join('')
+          }
         </div>
       </div>
 
-      <footer>
-        <p>🏙️ <a href="https://alhousseynouba.com">alhousseynouba.com</a> &nbsp;|&nbsp; <a href="https://thies.city">thies.city</a> &nbsp;|&nbsp; <a href="https://senegaluni.com">senegaluni.com</a></p>
-        <p style="margin-top:8px">Thiès 2027 — L'Audace de la Transformation</p>
-      </footer>
-    `;
-
-    // Animate bars after render
-    setTimeout(() => {
-      document.querySelectorAll('.lang-bar-fill[data-w]').forEach(el => {
-        el.style.width = el.dataset.w + '%';
-      });
-      document.querySelectorAll('.vote-bar-fill[data-w]').forEach(el => {
-        el.style.width = el.dataset.w + '%';
-      });
-      const cf = document.getElementById('coverageFill');
-      if (cf) cf.style.width = pct(avecNumero, total) + '%';
-    }, 100);
-  }
-
-  async function init() {
-    try {
-      const data = await fetchData();
-      render(data);
-    } catch (err) {
-      document.getElementById('app').innerHTML = `
-        <div class="section" style="text-align:center;padding:40px">
-          <div style="font-size:40px;margin-bottom:16px">⚠️</div>
-          <div style="color:var(--red);font-family:'Space Mono',monospace;font-size:13px">Erreur de chargement</div>
-          <div style="color:var(--muted);font-size:12px;margin-top:8px">${err.message}</div>
-          <button onclick="init()" style="margin-top:20px;background:var(--green);color:#000;border:none;padding:10px 24px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer">Réessayer</button>
+      <div class="section">
+        <div class="section-title"><span>⭐</span> Scoring Supporters</div>
+        <div class="table-wrapper" style="max-height:220px">
+          <table>
+            <thead><tr><th>Nom</th><th>Score</th><th>Niveau</th></tr></thead>
+            <tbody>
+              ${scoredUsers.slice(0, 10).map(u => {
+                const [label, cls] = scoreLabel(u.score);
+                return `<tr>
+                  <td>${u.first_name}${u.last_name ? ' ' + u.last_name : ''}</td>
+                  <td>
+                    <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--green)">${u.score}%</div>
+                    <div class="score-bar-bg"><div class="score-bar-fill" data-w="${u.score}"></div></div>
+                  </td>
+                  <td><span class="badge ${cls}">${label}</span></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
         </div>
-      `;
-    }
-  }
+      </div>
+    </div>
 
-  init();
-  // Refresh every 60 seconds
-  setInterval(init, 60000);
+    <!-- Benevoles full table -->
+    <div class="section">
+      <div class="section-title"><span>🤝</span> Liste des Bénévoles</div>
+      <div class="filter-bar">
+        ${uniqueQuartiers.map(q => `<button class="filter-btn ${q === 'Tous' ? 'active' : ''}" data-filter="${q}" onclick="filterBenevoles('${q}')">${q}</button>`).join('')}
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Nom</th><th>Quartier</th><th>Disponibilité</th><th>📱</th><th>Date</th></tr></thead>
+          <tbody id="benevoles-tbody">
+            ${benevoles.length === 0 ? '<tr><td colspan="5" class="empty">Aucun bénévole</td></tr>' :
+              benevoles.slice().reverse().map(b => {
+                const [dispLabel, dispClass] = disponibiliteLabel(b.disponibilite);
+                return `<tr>
+                  <td>${b.first_name}${b.last_name ? ' ' + b.last_name : ''}</td>
+                  <td>${b.quartier || '—'}</td>
+                  <td><span class="badge ${dispClass}">${dispLabel}</span></td>
+                  <td>${b.phone ? '✅' : '—'}</td>
+                  <td>${b.created_at ? new Date(b.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+                </tr>`;
+              }).join('')
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      <p>🏙️ <a href="https://alhousseynouba.com">alhousseynouba.com</a> &nbsp;|&nbsp; <a href="https://thies.city">thies.city</a> &nbsp;|&nbsp; <a href="https://senegaluni.com">senegaluni.com</a></p>
+      <p style="margin-top:6px">Thiès 2027 — L'Audace de la Transformation</p>
+    </footer>
+  `;
+
+  // Animate bars
+  setTimeout(() => {
+    document.querySelectorAll('.lang-bar-fill[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    document.querySelectorAll('.vote-bar-fill[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    document.querySelectorAll('.score-bar-fill[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    const cf = document.getElementById('coverageFill');
+    if (cf) cf.style.width = pct(avecNumero, total) + '%';
+
+    // Draw pie chart
+    if (voteList.length > 0) {
+      drawPie('votesPie', voteList.map(([r, count], i) => ({ value: count, color: VOTE_COLORS[i % VOTE_COLORS.length] })));
+    }
+  }, 100);
+}
+
+async function init() {
+  try {
+    const data = await fetchData();
+    render(data);
+  } catch (err) {
+    document.getElementById('app').innerHTML = `
+      <div class="section" style="text-align:center;padding:40px">
+        <div style="font-size:40px;margin-bottom:16px">⚠️</div>
+        <div style="color:var(--red);font-family:'Space Mono',monospace;font-size:13px">Erreur de chargement</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:8px">${err.message}</div>
+        <button onclick="init()" style="margin-top:20px;background:var(--green);color:#000;border:none;padding:10px 24px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer">Réessayer</button>
+      </div>`;
+  }
+}
+
+init();
+setInterval(init, 60000);
 </script>
 </body>
 </html>
