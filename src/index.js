@@ -1,4 +1,4 @@
-// Thies Ma Ville — WhatsApp Bot v3 + Dashboard
+// Thies Ma Ville — WhatsApp Bot v4 — All Features
 
 import express from "express";
 import pkg from "twilio";
@@ -19,6 +19,7 @@ const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cors());
+
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -31,9 +32,7 @@ const ADMIN_PHONES = ["+221771980297"];
 const sessions = new Map();
 
 function getSession(from) {
-  if (!sessions.has(from)) {
-    sessions.set(from, { history: [], benevole: null, awaitingSondage: false });
-  }
+  if (!sessions.has(from)) sessions.set(from, { history: [], benevole: null, awaitingSondage: false });
   return sessions.get(from);
 }
 
@@ -44,6 +43,16 @@ function generateCode(phone) {
 
 function cleanPhone(from) {
   return from.replace("whatsapp:", "");
+}
+
+// ─── Send WhatsApp message ────────────────────────────────────────────────────
+async function sendWhatsAppMessage(to, body) {
+  const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  try {
+    await client.messages.create({ from: WHATSAPP_NUMBER, to, body });
+  } catch (err) {
+    console.error("❌ Twilio send error:", err.message);
+  }
 }
 
 // ─── Track WhatsApp user ──────────────────────────────────────────────────────
@@ -78,21 +87,12 @@ async function trackWhatsAppUser(from, profileName = null, referredBy = null) {
           referred_phone: phone,
         });
         if (referrer.phone) {
-          await sendWhatsAppMessage(`whatsapp:${referrer.phone}`, `🎉 *Nouveau supporter recruté !*\n\n${profileName || "Un ami"} a rejoint Thiès Ma Ville grâce à votre lien ! Jërejëf 🙏\n\nContinuez à partager ! 🏙️`);
+          await sendWhatsAppMessage(`whatsapp:${referrer.phone}`,
+            `🎉 *Nouveau supporter recruté !*\n\n${profileName || "Un ami"} a rejoint Thiès Ma Ville grâce à votre lien ! Jërejëf 🙏\n\nContinuez à partager ! 🏙️`);
         }
       }
     }
     console.log("✅ New WhatsApp user:", phone);
-  }
-}
-
-// ─── Send WhatsApp message ────────────────────────────────────────────────────
-async function sendWhatsAppMessage(to, body) {
-  const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  try {
-    await client.messages.create({ from: WHATSAPP_NUMBER, to, body });
-  } catch (err) {
-    console.error("❌ Twilio send error:", err.message);
   }
 }
 
@@ -123,7 +123,7 @@ TES FONCTIONS (détection automatique):
 3. PROGRAMME → agenda optimisé par quartier
 4. PLAINTE → solution + budget CFA estimé + note vocale wolof 15s
 
-COMMANDES: rejoindre | inviter | sondage | info | plainte | traduire | attaque | programme | dashboard
+COMMANDES: rejoindre | inviter | sondage | info | plainte | traduire | attaque | programme | dashboard | tache | taches
 
 PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Salam aleykum, Waaw, Jërejëf.
 RÈGLES: Réponses TOUJOURS sous 1500 caractères. Spécifique à Thiès. Détection langue auto.`;
@@ -145,11 +145,63 @@ Tapez :
 🔗 *inviter* — Votre lien de recrutement
 🤝 *rejoindre* — Rejoindre l'équipe
 🗳️ *sondage* — Donner votre avis
+📊 *dashboard* — Statistiques campagne
 
 🌐 alhousseynouba.com | 🏙️ thies.city`;
 }
 
-// ─── Admin rapport text ───────────────────────────────────────────────────────
+// ─── Système de tâches ────────────────────────────────────────────────────────
+async function assignerTacheWA(from, args, profileName) {
+  const phone = cleanPhone(from);
+  if (!ADMIN_PHONES.includes(phone)) return "⛔ Commande réservée à l'équipe de campagne.";
+
+  const parts = args.trim().split(" ");
+  const quartier = parts[0];
+  const description = parts.slice(1).join(" ");
+
+  if (!quartier || !description) {
+    return "❌ Format: *tache [quartier] [description]*\nEx: *tache Nguinth Distribuer les flyers rue principale*";
+  }
+
+  const { data: tache, error } = await supabase.from("taches").insert({
+    quartier, description, assigned_by: null, status: "active"
+  }).select().single();
+
+  if (error) { console.error("❌ Tache error:", error); return "❌ Erreur lors de la création de la tâche."; }
+
+  // Notify benevoles in that quartier via WhatsApp
+  const { data: benevoles } = await supabase.from("benevoles").select("*").ilike("quartier", `%${quartier}%`);
+  let notifies = 0;
+  for (const b of benevoles || []) {
+    if (!b.phone) continue;
+    try {
+      await sendWhatsAppMessage(`whatsapp:${b.phone}`,
+        `📋 *Nouvelle Mission — Thiès 2027*\n\n📍 Quartier: *${quartier}*\n📝 Tâche: ${description}\n\nRépondez:\n✅ *fait* — Mission accomplie\n❌ *probleme* — Besoin d'aide\n\n_Jërejëf pour votre engagement !_ 🏙️`);
+      notifies++;
+    } catch (e) {}
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return `✅ Tâche assignée à *${notifies} bénévole(s)* de *${quartier}* !\n\n📝 "${description}"`;
+}
+
+async function voirTachesWA(from) {
+  const phone = cleanPhone(from);
+  if (!ADMIN_PHONES.includes(phone)) return "⛔ Commande réservée à l'équipe de campagne.";
+
+  const { data: taches } = await supabase.from("taches").select("*").eq("status", "active").order("created_at", { ascending: false });
+  if (!taches || taches.length === 0) return "📋 Aucune tâche active pour le moment.";
+
+  const { data: confirmations } = await supabase.from("tache_confirmations").select("*");
+  let text = `📋 *Tâches Actives — Thiès 2027*\n\n`;
+  for (const t of taches.slice(0, 5)) {
+    const faites = confirmations?.filter(c => c.tache_id === t.id && c.status === "fait").length || 0;
+    const problemes = confirmations?.filter(c => c.tache_id === t.id && c.status === "probleme").length || 0;
+    text += `*${t.quartier}*: ${t.description}\n✅ ${faites} fait | ❌ ${problemes} problème\n\n`;
+  }
+  return text;
+}
+
+// ─── Admin rapport ────────────────────────────────────────────────────────────
 async function buildRapport() {
   const { data: users } = await supabase.from("users").select("*");
   const { data: benevoles } = await supabase.from("benevoles").select("*");
@@ -232,7 +284,39 @@ function scheduleWeeklySondage() {
   }, msUntilNext);
 }
 
-// ─── Dashboard route ──────────────────────────────────────────────────────────
+// ─── Auto follow-up 24h ───────────────────────────────────────────────────────
+async function sendWhatsAppFollowUps() {
+  const { data: users } = await supabase.from("users").select("*").not("phone", "is", null);
+  if (!users) return;
+  for (const user of users) {
+    try {
+      const { data: existing } = await supabase.from("follow_ups").select("id").eq("phone", user.phone).eq("type", "24h").single();
+      if (existing) continue;
+    } catch (e) {}
+    const firstSeen = new Date(user.first_seen);
+    const hoursSince = (Date.now() - firstSeen) / (1000 * 60 * 60);
+    if (hoursSince < 24) continue;
+    const code = generateCode(user.phone);
+    const link = `https://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}`;
+    try {
+      await sendWhatsAppMessage(`whatsapp:${user.phone}`,
+        `Salam aleykum *${user.first_name}* ! 🏙️\n\nJërejëf d'avoir rejoint Thiès Ma Ville 2027 !\n\n👉 Avez-vous parlé de la campagne à *3 amis* ?\n\nPartagez votre lien :\n${link}\n\n_Ndank ndank mooy japp golo ci naaye_ 💪`);
+      await supabase.from("follow_ups").insert({ telegram_id: null, phone: user.phone, type: "24h" });
+      console.log(`✅ WhatsApp follow-up sent to ${user.first_name}`);
+    } catch (e) {
+      console.error(`❌ Follow-up error:`, e.message);
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+function scheduleWhatsAppFollowUps() {
+  setInterval(sendWhatsAppFollowUps, 60 * 60 * 1000);
+  setTimeout(sendWhatsAppFollowUps, 5 * 60 * 1000);
+  console.log("⏰ WhatsApp follow-up scheduler started");
+}
+
+// ─── Dashboard & API ──────────────────────────────────────────────────────────
 app.get("/dashboard", (req, res) => {
   try {
     const html = readFileSync(join(__dirname, "dashboard.html"), "utf-8");
@@ -242,7 +326,6 @@ app.get("/dashboard", (req, res) => {
   }
 });
 
-// ─── API stats endpoint ───────────────────────────────────────────────────────
 app.get("/api/stats", async (req, res) => {
   try {
     const [usersRes, benevolesRes, votesRes, referralsRes] = await Promise.all([
@@ -262,7 +345,6 @@ app.get("/api/stats", async (req, res) => {
   }
 });
 
-// ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({ status: "online", agent: BOT_NAME, timestamp: new Date().toISOString() });
 });
@@ -281,14 +363,14 @@ app.post("/webhook", async (req, res) => {
 
   await trackWhatsAppUser(from, profileName, session.referredBy || null);
 
-  // ── Greetings ───────────────────────────────────────────────────────────────
+  // ── Greetings ─────────────────────────────────────────────────────────────────
   const greetings = ["bonjour", "salam", "hello", "hi", "salut", "start", "aide", "help", "debut", "début"];
   if (greetings.some(g => msgLower.startsWith(g)) && session.history.length === 0) {
     response.message(welcomeMessage(profileName));
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── Referral code ───────────────────────────────────────────────────────────
+  // ── Referral code ─────────────────────────────────────────────────────────────
   if (msgLower.startsWith("tmv") && session.history.length === 0) {
     session.referredBy = incomingMsg.trim();
     await trackWhatsAppUser(from, profileName, session.referredBy);
@@ -296,51 +378,57 @@ app.post("/webhook", async (req, res) => {
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── inviter ─────────────────────────────────────────────────────────────────
+  // ── inviter ───────────────────────────────────────────────────────────────────
   if (["inviter", "invite", "lien"].includes(msgLower)) {
     const code = generateCode(phone);
     const { data: refs } = await supabase.from("referrals").select("id").eq("referrer_phone", phone);
     const count = refs?.length || 0;
-    response.message(`🔗 *Votre lien de recrutement :*
-
-https://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}
-
-Partagez avec vos amis et famille !
-
-📊 Vous avez recruté *${count} supporter(s)*.
-
-_Ndank ndank mooy japp golo ci naaye !_ 🏙️`);
+    response.message(`🔗 *Votre lien de recrutement :*\n\nhttps://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}\n\nPartagez avec vos amis et famille !\n\n📊 Vous avez recruté *${count} supporter(s)*.\n\n_Ndank ndank mooy japp golo ci naaye !_ 🏙️`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── dashboard ───────────────────────────────────────────────────────────────
-  if (msgLower === "dashboard" || msgLower === "stats") {
-    response.message(`📊 *Dashboard Campagne Thiès 2027*
-
-Consultez toutes vos statistiques en temps réel :
-
-🔗 ${DASHBOARD_URL}
-
-Supporters, bénévoles, votes, referrals — tout en un coup d'œil ! 🏙️`);
+  // ── dashboard ─────────────────────────────────────────────────────────────────
+  if (["dashboard", "stats"].includes(msgLower)) {
+    response.message(`📊 *Dashboard Campagne Thiès 2027*\n\nConsultez toutes vos statistiques en temps réel :\n\n🔗 ${DASHBOARD_URL}\n\nSupporters, bénévoles, votes, referrals, carte — tout en un coup d'œil ! 🏙️`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── sondage ─────────────────────────────────────────────────────────────────
+  // ── tache (admin) ─────────────────────────────────────────────────────────────
+  if (msgLower.startsWith("tache ") && ADMIN_PHONES.includes(phone)) {
+    const args = incomingMsg.replace(/^tache /i, "");
+    const reply = await assignerTacheWA(from, args, profileName);
+    response.message(reply);
+    res.type("text/xml"); return res.send(response.toString());
+  }
+
+  // ── taches (admin) ────────────────────────────────────────────────────────────
+  if (msgLower === "taches" && ADMIN_PHONES.includes(phone)) {
+    const reply = await voirTachesWA(from);
+    response.message(reply);
+    res.type("text/xml"); return res.send(response.toString());
+  }
+
+  // ── Confirmation tâche ────────────────────────────────────────────────────────
+  if (["fait", "probleme"].includes(msgLower)) {
+    const status = msgLower === "fait" ? "fait" : "probleme";
+    const { data: taches } = await supabase.from("taches").select("*").eq("status", "active");
+    if (taches && taches.length > 0) {
+      await supabase.from("tache_confirmations").insert({ tache_id: taches[0].id, telegram_id: null, phone, status });
+      response.message(status === "fait"
+        ? `✅ Jërejëf ! Mission confirmée. Tu es un vrai champion de Thiès 2027 ! 💪🏙️`
+        : `❌ Merci pour le retour ! L'équipe va vous contacter. Jërejëf ! 🙏`);
+      res.type("text/xml"); return res.send(response.toString());
+    }
+  }
+
+  // ── sondage ───────────────────────────────────────────────────────────────────
   if (msgLower === "sondage") {
     session.awaitingSondage = true;
-    response.message(`🗳️ *Sondage Thiès 2027*
-
-Quel est votre problème principal à Thiès ?
-
-1️⃣ Routes et pavage
-2️⃣ Eau et électricité
-3️⃣ Emploi et jeunesse
-4️⃣ Santé et hôpital
-5️⃣ Éducation et écoles`);
+    response.message(`🗳️ *Sondage Thiès 2027*\n\nQuel est votre problème principal à Thiès ?\n\n1️⃣ Routes et pavage\n2️⃣ Eau et électricité\n3️⃣ Emploi et jeunesse\n4️⃣ Santé et hôpital\n5️⃣ Éducation et écoles`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── Sondage response ─────────────────────────────────────────────────────────
+  // ── Sondage response ──────────────────────────────────────────────────────────
   if (session.awaitingSondage && ["1", "2", "3", "4", "5"].includes(incomingMsg)) {
     const reponses = { "1": "Routes et pavage", "2": "Eau et électricité", "3": "Emploi et jeunesse", "4": "Santé et hôpital", "5": "Éducation et écoles" };
     await supabase.from("votes").insert({ telegram_id: null, question: "Problème principal à Thiès", reponse: reponses[incomingMsg] });
@@ -349,15 +437,10 @@ Quel est votre problème principal à Thiès ?
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── rejoindre (benevole) ────────────────────────────────────────────────────
+  // ── rejoindre (benevole) ──────────────────────────────────────────────────────
   if (["rejoindre", "benevole", "bénévole"].includes(msgLower)) {
     session.benevole = { step: 1 };
-    response.message(`🤝 *Rejoindre l'équipe !*
-
-Waaw ! Jërejëf pour votre engagement 🙏
-
-*Question 1/2* — Quel est votre quartier à Thiès ?
-(Ex: Médina Fall, Randoulène, Cité Sonatel, Nord, Est, Gare...)`);
+    response.message(`🤝 *Rejoindre l'équipe !*\n\nWaaw ! Jërejëf pour votre engagement 🙏\n\n*Question 1/2* — Quel est votre quartier à Thiès ?\n(Ex: Médina Fall, Randoulène, Cité Sonatel, Nord, Est, Gare...)`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
@@ -365,11 +448,7 @@ Waaw ! Jërejëf pour votre engagement 🙏
     if (session.benevole.step === 1) {
       session.benevole.quartier = incomingMsg;
       session.benevole.step = 2;
-      response.message(`*Question 2/2* — Quelle est votre disponibilité ?
-
-1️⃣ Week-end seulement
-2️⃣ Soirs de semaine
-3️⃣ Temps plein`);
+      response.message(`*Question 2/2* — Quelle est votre disponibilité ?\n\n1️⃣ Week-end seulement\n2️⃣ Soirs de semaine\n3️⃣ Temps plein`);
       res.type("text/xml"); return res.send(response.toString());
     }
     if (session.benevole.step === 2) {
@@ -384,25 +463,19 @@ Waaw ! Jërejëf pour votre engagement 🙏
       if (error) console.error("❌ Benevole error:", error);
       else console.log("✅ WhatsApp benevole inserted!");
       session.benevole = null;
-      response.message(`✅ *Inscription confirmée !*
-
-Jërejëf ${profileName || ""} ! Tu fais partie de l'équipe Thiès 2027 ! 🏙️
-
-👉 Recrutez vos amis : tapez *inviter*
-
-*Ndank ndank mooy japp golo ci naaye !* 💪`);
+      response.message(`✅ *Inscription confirmée !*\n\nJërejëf ${profileName || ""} ! Tu fais partie de l'équipe Thiès 2027 ! 🏙️\n\n👉 Recrutez vos amis : tapez *inviter*\n\n*Ndank ndank mooy japp golo ci naaye !* 💪`);
       res.type("text/xml"); return res.send(response.toString());
     }
   }
 
-  // ── Admin: rapport ──────────────────────────────────────────────────────────
+  // ── rapport (admin) ───────────────────────────────────────────────────────────
   if (msgLower === "rapport" && ADMIN_PHONES.includes(phone)) {
     const rapport = await buildRapport();
     response.message(rapport);
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── Admin: broadcast ────────────────────────────────────────────────────────
+  // ── broadcast (admin) ─────────────────────────────────────────────────────────
   if (msgLower.startsWith("broadcast ") && ADMIN_PHONES.includes(phone)) {
     const message = incomingMsg.replace(/^broadcast /i, "");
     const { data: users } = await supabase.from("users").select("phone").not("phone", "is", null);
@@ -418,14 +491,14 @@ Jërejëf ${profileName || ""} ! Tu fais partie de l'équipe Thiès 2027 ! 🏙�
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── reset ───────────────────────────────────────────────────────────────────
+  // ── reset ─────────────────────────────────────────────────────────────────────
   if (msgLower === "reset") {
     sessions.delete(from);
     response.message("✅ Conversation réinitialisée. Jërejëf !");
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── Claude AI ───────────────────────────────────────────────────────────────
+  // ── Claude AI ─────────────────────────────────────────────────────────────────
   session.history.push({ role: "user", content: incomingMsg });
   if (session.history.length > 20) session.history = session.history.slice(-20);
 
@@ -458,46 +531,12 @@ app.post("/reset/:phone", (req, res) => {
   const phone = `whatsapp:+${req.params.phone}`;
   sessions.delete(phone);
   res.json({ reset: true, phone });
-}); 
-// ─── Auto follow-up 24h WhatsApp ─────────────────────────────────────────────
-async function sendWhatsAppFollowUps() {
-  const { data: users } = await supabase.from("users").select("*")
-    .not("phone", "is", null);
-  if (!users) return;
-
-  for (const user of users) {
-    const { data: existing } = await supabase.from("follow_ups")
-      .select("id").eq("phone", user.phone).eq("type", "24h").single();
-    if (existing) continue;
-
-    const firstSeen = new Date(user.first_seen);
-    const hoursSince = (Date.now() - firstSeen) / (1000 * 60 * 60);
-    if (hoursSince < 24) continue;
-
-    const code = generateCode(user.phone);
-    const link = `https://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}`;
-    try {
-      await sendWhatsAppMessage(`whatsapp:${user.phone}`,
-        `Salam aleykum *${user.first_name}* ! 🏙️\n\nJërejëf d'avoir rejoint Thiès Ma Ville 2027 !\n\n👉 Avez-vous parlé de la campagne à *3 amis* ?\n\nPartagez votre lien :\n${link}\n\n_Ndank ndank mooy japp golo ci naaye_ 💪`);
-      await supabase.from("follow_ups").insert({ telegram_id: null, phone: user.phone, type: "24h" });
-      console.log(`✅ WhatsApp follow-up sent to ${user.first_name}`);
-    } catch (e) {
-      console.error(`❌ Follow-up error:`, e.message);
-    }
-    await new Promise(r => setTimeout(r, 100));
-  }
-}
-
-function scheduleWhatsAppFollowUps() {
-  setInterval(sendWhatsAppFollowUps, 60 * 60 * 1000);
-  setTimeout(sendWhatsAppFollowUps, 5 * 60 * 1000);
-  console.log("⏰ WhatsApp follow-up scheduler started");
-}
+});
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🏙️ ${BOT_NAME} WhatsApp Bot running on port ${PORT}`);
+  console.log(`🏙️ ${BOT_NAME} WhatsApp Bot v4 running on port ${PORT}`);
   scheduleWeeklySondage();
-scheduleWhatsAppFollowUps();
-  });
+  scheduleWhatsAppFollowUps();
+});
