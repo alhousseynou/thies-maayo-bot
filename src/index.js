@@ -1,4 +1,4 @@
-// Thies Ma Ville — WhatsApp Bot v5 — Phase 2
+// Thies Ma Ville — WhatsApp Bot v6 — Voice
 
 import express from "express";
 import pkg from "twilio";
@@ -6,12 +6,11 @@ const { twiml } = pkg;
 import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import cors from "cors";
 import PDFDocument from "pdfkit";
-import { PassThrough } from "stream";
 
 dotenv.config();
 
@@ -30,6 +29,8 @@ const WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || "whatsapp:+1415523
 const DASHBOARD_URL = process.env.DASHBOARD_URL || "https://thies-maayo-bot.onrender.com/dashboard";
 const BASE_URL = process.env.BASE_URL || "https://thies-maayo-bot.onrender.com";
 const ADMIN_PHONES = ["+221771980297"];
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "RsFOT0jgZkwkcYbjMH9c";
 
 // ─── Session store ────────────────────────────────────────────────────────────
 const sessions = new Map();
@@ -37,30 +38,46 @@ function getSession(from) {
   if (!sessions.has(from)) sessions.set(from, { history: [], benevole: null, awaitingSondage: false });
   return sessions.get(from);
 }
-function generateCode(phone) {
-  const digits = phone.replace(/\D/g, "").slice(-8);
-  return `TMV${digits}`;
-}
+function generateCode(phone) { return `TMV${phone.replace(/\D/g, "").slice(-8)}`; }
 function cleanPhone(from) { return from.replace("whatsapp:", ""); }
+
+// ─── Generate voice with ElevenLabs ──────────────────────────────────────────
+async function generateVoice(text) {
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+    method: "POST",
+    headers: { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.5, use_speaker_boost: true },
+    }),
+  });
+  if (!res.ok) throw new Error(`ElevenLabs error: ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// ─── Store audio and serve it ─────────────────────────────────────────────────
+let audioCache = {};
+
+app.get("/audio/:id", (req, res) => {
+  const audio = audioCache[req.params.id];
+  if (!audio) { res.status(404).send("Audio not found"); return; }
+  res.setHeader("Content-Type", "audio/mpeg");
+  res.setHeader("Content-Disposition", "inline; filename=message.mp3");
+  res.send(audio);
+});
 
 // ─── Send WhatsApp message ────────────────────────────────────────────────────
 async function sendWhatsAppMessage(to, body) {
   const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  try {
-    await client.messages.create({ from: WHATSAPP_NUMBER, to, body });
-  } catch (err) {
-    console.error("❌ Twilio send error:", err.message);
-  }
+  try { await client.messages.create({ from: WHATSAPP_NUMBER, to, body }); }
+  catch (err) { console.error("❌ Twilio send error:", err.message); }
 }
 
-// ─── Send WhatsApp message with media ────────────────────────────────────────
 async function sendWhatsAppMedia(to, body, mediaUrl) {
   const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  try {
-    await client.messages.create({ from: WHATSAPP_NUMBER, to, body, mediaUrl: [mediaUrl] });
-  } catch (err) {
-    console.error("❌ Twilio media send error:", err.message);
-  }
+  try { await client.messages.create({ from: WHATSAPP_NUMBER, to, body, mediaUrl: [mediaUrl] }); }
+  catch (err) { console.error("❌ Twilio media error:", err.message); }
 }
 
 // ─── Track WhatsApp user ──────────────────────────────────────────────────────
@@ -81,30 +98,19 @@ async function trackWhatsAppUser(from, profileName = null, referredBy = null) {
       const { data: referrer } = await supabase.from("users").select("telegram_id, phone, first_name").eq("referral_code", referredBy).single();
       if (referrer) {
         await supabase.from("referrals").insert({ referrer_telegram_id: referrer.telegram_id || null, referred_telegram_id: null, referrer_phone: referrer.phone || null, referred_phone: phone });
-        if (referrer.phone) await sendWhatsAppMessage(`whatsapp:${referrer.phone}`, `🎉 *Nouveau supporter recruté !*\n\n${profileName || "Un ami"} a rejoint Thiès Ma Ville grâce à votre lien ! Jërejëf 🙏\n\nContinuez à partager ! 🏙️`);
+        if (referrer.phone) await sendWhatsAppMessage(`whatsapp:${referrer.phone}`, `🎉 *Nouveau supporter recruté !*\n\n${profileName || "Un ami"} a rejoint Thiès Ma Ville ! Jërejëf 🙏🏙️`);
       }
     }
   }
 }
 
-// ─── System prompt ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `Tu es "Thies Ma Ville" — l'assistant officiel de la campagne d'ALHOUSSEYNOU BA, candidat à la Mairie de Thiès en 2027. Tu opères sur WhatsApp.
-
+// ─── System prompts ───────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `Tu es "Thies Ma Ville" — l'assistant officiel de la campagne d'ALHOUSSEYNOU BA, candidat à la Mairie de Thiès en 2027.
 NOM: Alhousseynou Ba | SLOGAN: "Thiès 2027 : L'Audace de la Transformation"
-PARTI: FARLU | COALITION: Sénégal Uni | SITE: alhousseynouba.com | WA: +221 77 198 02 97
+PROJET: E-Mairie, Wi-Fi gratuit, 10,000 emplois, Micro-crédits Jaango, Thiès Ville Verte
+PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Réponses sous 1500 caractères.`;
 
-PROJET THIÈS:
-AXE 1 — GOUVERNANCE: Conseil des Sages, Budget Participatif 15%
-AXE 2 — DIGITAL: E-Mairie, Wi-Fi Public gratuit
-AXE 3 — INTERNATIONAL: Jumelages USA/Égypte/Turquie, 10,000 emplois sur 3 ans
-AXE 4 — FONDS CITOYEN: Micro-crédits Jaango sans intérêts
-AXE 5 — CADRE DE VIE: Pavage, Thiès Ville Verte, collecte déchets géolocalisée
-
-TES FONCTIONS: TRADUCTION | ATTAQUE | PROGRAMME | PLAINTE
-PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Salam aleykum, Waaw, Jërejëf.
-RÈGLES: Réponses TOUJOURS sous 1500 caractères. Spécifique à Thiès. Détection langue auto.`;
-
-const WOLOF_PROMPT = `Tu es "Thies Ma Ville" — l'assistant officiel de la campagne d'ALHOUSSEYNOU BA. Tu réponds UNIQUEMENT en Wolof pur. Utilise un langage simple et accessible pour les anciens et les marchés. Mentionne les projets: Wi-Fi gratuit, E-Mairie, emplois jeunes, routes, micro-crédits Jaango.`;
+const WOLOF_PROMPT = `Tu es "Thies Ma Ville". Tu réponds UNIQUEMENT en Wolof pur. Langage simple pour les anciens et marchés de Thiès. Mentionne: Wi-Fi gratuit, E-Mairie, emplois jeunes, routes pavées, micro-crédits Jaango.`;
 
 // ─── Welcome message ──────────────────────────────────────────────────────────
 function welcomeMessage(name = "") {
@@ -115,20 +121,21 @@ ${name ? `Salam aleykum ${name} !` : "Salam aleykum !"}
 Je suis l'assistant d'*Alhousseynou Ba*, candidat Mairie de Thiès 2027.
 
 Tapez :
-1️⃣ *plainte* — Signaler un problème
-2️⃣ *traduire* — Traduire une politique
-3️⃣ *attaque* — Répondre à une attaque
-4️⃣ *programme* — Optimiser un agenda
 🔗 *inviter* — Votre lien de recrutement
 🤝 *rejoindre* — Rejoindre l'équipe
 🗳️ *sondage* — Donner votre avis
-📊 *dashboard* — Statistiques campagne
 🗣️ *wolof [texte]* — Réponse en Wolof
+🎙️ *audio [texte]* — Message vocal français
+🎙️ *audio-wolof [texte]* — Message vocal Wolof
+📊 *dashboard* — Statistiques
 
 🌐 alhousseynouba.com | 🏙️ thies.city`;
 }
 
-// ─── Generate PDF rapport ─────────────────────────────────────────────────────
+// ─── PDF generation ───────────────────────────────────────────────────────────
+let latestPDFBuffer = null;
+let latestPDFDate = null;
+
 async function generatePDFBuffer(data) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
@@ -136,42 +143,20 @@ async function generatePDFBuffer(data) {
     doc.on('data', chunk => buffers.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(buffers)));
     doc.on('error', reject);
-
     const { users, benevoles, votes, referrals } = data;
-    const total = users.length;
-    const avecNumero = users.filter(u => u.phone).length;
-    const totalBen = benevoles.length;
-    const totalVotes = votes.length;
-    const totalRefs = referrals.length;
-
-    const byQuartier = {};
-    benevoles.forEach(b => { byQuartier[b.quartier] = (byQuartier[b.quartier] || 0) + 1; });
-
-    const byReponse = {};
-    votes.forEach(v => { byReponse[v.reponse] = (byReponse[v.reponse] || 0) + 1; });
-
     const date = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    // Header
     doc.rect(0, 0, 612, 120).fill('#00c853');
     doc.fillColor('white').fontSize(28).font('Helvetica-Bold').text('THIÈS MA VILLE', 50, 30);
     doc.fontSize(14).font('Helvetica').text('Rapport Hebdomadaire de Campagne', 50, 65);
     doc.fontSize(11).text(date, 50, 88);
-
     doc.fillColor('#1a1a1a').moveDown(4);
-
-    // KPIs
-    doc.fontSize(16).font('Helvetica-Bold').fillColor('#00c853').text('📊 STATISTIQUES CLÉS', 50, 140);
-    doc.moveTo(50, 160).lineTo(560, 160).strokeColor('#00c853').stroke();
-
     const kpis = [
-      { label: 'Total Supporters', value: total },
-      { label: 'Avec Numéro', value: `${avecNumero} (${total ? Math.round(avecNumero/total*100) : 0}%)` },
-      { label: 'Bénévoles', value: totalBen },
-      { label: 'Votes Sondage', value: totalVotes },
-      { label: 'Recrutements', value: totalRefs },
+      { label: 'Total Supporters', value: users.length },
+      { label: 'Avec Numéro', value: `${users.filter(u => u.phone).length}` },
+      { label: 'Bénévoles', value: benevoles.length },
+      { label: 'Votes', value: votes.length },
+      { label: 'Recrutements', value: referrals.length },
     ];
-
     let y = 175;
     kpis.forEach((kpi, i) => {
       const x = i % 2 === 0 ? 50 : 320;
@@ -181,126 +166,36 @@ async function generatePDFBuffer(data) {
       doc.fillColor('#666').fontSize(10).font('Helvetica').text(kpi.label, x + 12, y + 8);
       doc.fillColor('#1a1a1a').fontSize(20).font('Helvetica-Bold').text(String(kpi.value), x + 12, y + 22);
     });
-
-    y += 80;
-
-    // Benevoles by quartier
-    doc.fontSize(16).font('Helvetica-Bold').fillColor('#00c853').text('🗺️ BÉNÉVOLES PAR QUARTIER', 50, y);
-    doc.moveTo(50, y + 20).lineTo(560, y + 20).strokeColor('#00c853').stroke();
-    y += 35;
-
-    const quartierList = Object.entries(byQuartier).sort((a, b) => b[1] - a[1]);
-    if (quartierList.length === 0) {
-      doc.fillColor('#666').fontSize(12).font('Helvetica').text('Aucun bénévole encore.', 50, y);
-      y += 25;
-    } else {
-      quartierList.forEach(([q, n]) => {
-        const barW = Math.min((n / Math.max(...quartierList.map(x => x[1]))) * 300, 300);
-        doc.fillColor('#1a1a1a').fontSize(12).font('Helvetica-Bold').text(q, 50, y);
-        doc.rect(200, y + 2, barW, 14).fillColor('#00c853').fill();
-        doc.fillColor('#1a1a1a').fontSize(12).font('Helvetica').text(String(n), 510, y);
-        y += 25;
-      });
-    }
-
-    y += 15;
-
-    // Votes
-    doc.fontSize(16).font('Helvetica-Bold').fillColor('#00c853').text('🗳️ RÉSULTATS SONDAGE', 50, y);
-    doc.moveTo(50, y + 20).lineTo(560, y + 20).strokeColor('#00c853').stroke();
-    y += 35;
-
-    const voteList = Object.entries(byReponse).sort((a, b) => b[1] - a[1]);
-    if (voteList.length === 0) {
-      doc.fillColor('#666').fontSize(12).font('Helvetica').text('Aucun vote encore.', 50, y);
-      y += 25;
-    } else {
-      voteList.forEach(([r, n]) => {
-        const barW = Math.min((n / Math.max(...voteList.map(x => x[1]))) * 250, 250);
-        doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica').text(r, 50, y, { width: 200 });
-        doc.rect(260, y + 2, barW, 14).fillColor('#2979ff').fill();
-        doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica').text(String(n), 520, y);
-        y += 25;
-      });
-    }
-
-    y += 15;
-
-    // Supporters list
-    if (y < 650) {
-      doc.fontSize(16).font('Helvetica-Bold').fillColor('#00c853').text('👥 DERNIERS SUPPORTERS', 50, y);
-      doc.moveTo(50, y + 20).lineTo(560, y + 20).strokeColor('#00c853').stroke();
-      y += 35;
-
-      const recent = users.slice(-8).reverse();
-      recent.forEach(u => {
-        doc.fillColor('#1a1a1a').fontSize(11).font('Helvetica')
-          .text(`${u.first_name}${u.last_name ? ' ' + u.last_name : ''}`, 50, y, { width: 200 })
-          .text(u.language?.toUpperCase() || 'FR', 260, y, { width: 60 })
-          .text(u.phone ? '✓ Numéro' : '— Sans numéro', 330, y, { width: 120 })
-          .text(u.first_seen ? new Date(u.first_seen).toLocaleDateString('fr-FR') : '—', 460, y);
-        y += 20;
-      });
-    }
-
-    // Footer
     doc.rect(0, 780, 612, 60).fillColor('#00c853').fill();
-    doc.fillColor('white').fontSize(10).font('Helvetica')
-      .text('alhousseynouba.com  |  thies.city  |  senegaluni.com', 50, 795, { align: 'center', width: 512 });
-    doc.fontSize(9).text('Thiès 2027 — L\'Audace de la Transformation', 50, 812, { align: 'center', width: 512 });
-
+    doc.fillColor('white').fontSize(10).font('Helvetica').text('alhousseynouba.com | thies.city | senegaluni.com', 50, 795, { align: 'center', width: 512 });
+    doc.fontSize(9).text("Thiès 2027 — L'Audace de la Transformation", 50, 812, { align: 'center', width: 512 });
     doc.end();
   });
 }
 
-// Store latest PDF in memory for serving
-let latestPDFBuffer = null;
-let latestPDFDate = null;
-
 app.get("/rapport.pdf", (req, res) => {
-  if (!latestPDFBuffer) {
-    res.status(404).send("Rapport pas encore généré. Attendez lundi matin.");
-    return;
-  }
+  if (!latestPDFBuffer) { res.status(404).send("Rapport pas encore généré."); return; }
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="rapport-thies-2027-${latestPDFDate}.pdf"`);
   res.send(latestPDFBuffer);
 });
 
-// ─── Send weekly PDF rapport every Monday at 8am ──────────────────────────────
 async function sendWeeklyPDFRapport() {
-  console.log("📄 Generating weekly PDF rapport...");
   try {
     const [usersRes, benevolesRes, votesRes, referralsRes] = await Promise.all([
-      supabase.from("users").select("*"),
-      supabase.from("benevoles").select("*"),
-      supabase.from("votes").select("*"),
-      supabase.from("referrals").select("*"),
+      supabase.from("users").select("*"), supabase.from("benevoles").select("*"),
+      supabase.from("votes").select("*"), supabase.from("referrals").select("*"),
     ]);
-
-    const data = {
-      users: usersRes.data || [],
-      benevoles: benevolesRes.data || [],
-      votes: votesRes.data || [],
-      referrals: referralsRes.data || [],
-    };
-
+    const data = { users: usersRes.data || [], benevoles: benevolesRes.data || [], votes: votesRes.data || [], referrals: referralsRes.data || [] };
     latestPDFBuffer = await generatePDFBuffer(data);
     latestPDFDate = new Date().toISOString().split('T')[0];
     const pdfUrl = `${BASE_URL}/rapport.pdf`;
-
-    // Send to admin
     for (const adminPhone of ADMIN_PHONES) {
-      await sendWhatsAppMedia(
-        `whatsapp:${adminPhone}`,
-        `📊 *Rapport Hebdomadaire — Thiès 2027*\n\n_${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}_\n\n👥 Supporters: ${data.users.length}\n🤝 Bénévoles: ${data.benevoles.length}\n🗳️ Votes: ${data.votes.length}\n🔗 Referrals: ${data.referrals.length}\n\n📄 Rapport PDF complet:\n${pdfUrl}\n\n_Jërejëf — Thiès 2027 !_ 🏙️`,
-        pdfUrl
-      );
+      await sendWhatsAppMedia(`whatsapp:${adminPhone}`,
+        `📊 *Rapport Hebdomadaire — Thiès 2027*\n\n👥 Supporters: ${data.users.length}\n🤝 Bénévoles: ${data.benevoles.length}\n🗳️ Votes: ${data.votes.length}\n\n📄 PDF: ${pdfUrl}\n\n_Jërejëf — Thiès 2027 !_ 🏙️`, pdfUrl);
     }
     console.log("✅ Weekly PDF rapport sent!");
-  } catch (err) {
-    console.error("❌ PDF rapport error:", err.message);
-  }
+  } catch (err) { console.error("❌ PDF rapport error:", err.message); }
 }
 
 function scheduleWeeklyPDFRapport() {
@@ -311,37 +206,7 @@ function scheduleWeeklyPDFRapport() {
   nextMonday.setUTCDate(now.getUTCDate() + daysUntilMonday);
   const msUntilNext = nextMonday - now;
   console.log(`📄 Next PDF rapport in ${Math.round(msUntilNext / 1000 / 60 / 60)} hours`);
-  setTimeout(async () => {
-    await sendWeeklyPDFRapport();
-    setInterval(sendWeeklyPDFRapport, 7 * 24 * 60 * 60 * 1000);
-  }, msUntilNext);
-}
-
-// ─── Système d'événements ─────────────────────────────────────────────────────
-async function creerEvenementWA(from, args) {
-  const phone = cleanPhone(from);
-  if (!ADMIN_PHONES.includes(phone)) return "⛔ Commande réservée à l'équipe de campagne.";
-
-  const parts = args.trim().split(" ");
-  const quartier = parts[0];
-  const details = parts.slice(1).join(" ");
-
-  if (!quartier || !details) {
-    return "❌ Format: *evenement [quartier] [détails]*\nEx: *evenement Nguinth Réunion samedi 15h place du marché*";
-  }
-
-  const { data: benevoles } = await supabase.from("benevoles").select("*").ilike("quartier", `%${quartier}%`);
-  let notifies = 0;
-  for (const b of benevoles || []) {
-    if (!b.phone) continue;
-    try {
-      await sendWhatsAppMessage(`whatsapp:${b.phone}`,
-        `📅 *Événement Campagne — Thiès 2027*\n\n📍 Quartier: *${quartier}*\n📋 ${details}\n\n🏙️ Votre présence est importante !\n_Alhousseynou Ba — L'Audace de la Transformation_\n\nJërejëf ! 🙏`);
-      notifies++;
-    } catch (e) {}
-    await new Promise(r => setTimeout(r, 100));
-  }
-  return `✅ Événement notifié à *${notifies} bénévole(s)* de *${quartier}* !\n\n📋 "${details}"`;
+  setTimeout(async () => { await sendWeeklyPDFRapport(); setInterval(sendWeeklyPDFRapport, 7 * 24 * 60 * 60 * 1000); }, msUntilNext);
 }
 
 // ─── Système de tâches ────────────────────────────────────────────────────────
@@ -352,19 +217,13 @@ async function assignerTacheWA(from, args) {
   const quartier = parts[0];
   const description = parts.slice(1).join(" ");
   if (!quartier || !description) return "❌ Format: *tache [quartier] [description]*";
-
   const { data: tache, error } = await supabase.from("taches").insert({ quartier, description, assigned_by: null, status: "active" }).select().single();
-  if (error) return "❌ Erreur lors de la création de la tâche.";
-
+  if (error) return "❌ Erreur lors de la création.";
   const { data: benevoles } = await supabase.from("benevoles").select("*").ilike("quartier", `%${quartier}%`);
   let notifies = 0;
   for (const b of benevoles || []) {
     if (!b.phone) continue;
-    try {
-      await sendWhatsAppMessage(`whatsapp:${b.phone}`,
-        `📋 *Nouvelle Mission — Thiès 2027*\n\n📍 Quartier: *${quartier}*\n📝 Tâche: ${description}\n\nRépondez:\n✅ *fait* — Mission accomplie\n❌ *probleme* — Besoin d'aide\n\n_Jërejëf !_ 🏙️`);
-      notifies++;
-    } catch (e) {}
+    try { await sendWhatsAppMessage(`whatsapp:${b.phone}`, `📋 *Nouvelle Mission — Thiès 2027*\n\n📍 *${quartier}*\n📝 ${description}\n\n✅ *fait* — Mission accomplie\n❌ *probleme* — Besoin d'aide\n\n_Jërejëf !_ 🏙️`); notifies++; } catch (e) {}
     await new Promise(r => setTimeout(r, 100));
   }
   return `✅ Tâche assignée à *${notifies} bénévole(s)* de *${quartier}* !\n\n📝 "${description}"`;
@@ -374,32 +233,32 @@ async function voirTachesWA(from) {
   const phone = cleanPhone(from);
   if (!ADMIN_PHONES.includes(phone)) return "⛔ Commande réservée à l'équipe de campagne.";
   const { data: taches } = await supabase.from("taches").select("*").eq("status", "active").order("created_at", { ascending: false });
-  if (!taches || taches.length === 0) return "📋 Aucune tâche active pour le moment.";
+  if (!taches || taches.length === 0) return "📋 Aucune tâche active.";
   const { data: confirmations } = await supabase.from("tache_confirmations").select("*");
-  let text = `📋 *Tâches Actives — Thiès 2027*\n\n`;
+  let text = `📋 *Tâches Actives*\n\n`;
   for (const t of taches.slice(0, 5)) {
     const faites = confirmations?.filter(c => c.tache_id === t.id && c.status === "fait").length || 0;
     const problemes = confirmations?.filter(c => c.tache_id === t.id && c.status === "probleme").length || 0;
-    text += `*${t.quartier}*: ${t.description}\n✅ ${faites} fait | ❌ ${problemes} problème\n\n`;
+    text += `*${t.quartier}*: ${t.description}\n✅ ${faites} | ❌ ${problemes}\n\n`;
   }
   return text;
 }
 
-// ─── Admin rapport texte ──────────────────────────────────────────────────────
-async function buildRapport() {
-  const { data: users } = await supabase.from("users").select("*");
-  const { data: benevoles } = await supabase.from("benevoles").select("*");
-  const { data: votes } = await supabase.from("votes").select("*");
-  const { data: referrals } = await supabase.from("referrals").select("*");
-  const total = users?.length || 0;
-  const avecNumero = users?.filter(u => u.phone).length || 0;
-  const byQuartier = {};
-  benevoles?.forEach(b => { byQuartier[b.quartier] = (byQuartier[b.quartier] || 0) + 1; });
-  const quartierText = Object.entries(byQuartier).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([q, n]) => `  • ${q}: ${n}`).join("\n") || "  Aucun encore";
-  const byReponse = {};
-  votes?.forEach(v => { byReponse[v.reponse] = (byReponse[v.reponse] || 0) + 1; });
-  const votesText = Object.entries(byReponse).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([r, n]) => `  • ${r}: ${n}`).join("\n") || "  Aucun encore";
-  return `📊 *Rapport — Thiès 2027*\n_${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}_\n\n👥 *Supporters: ${total}*\n  • Avec numéro: ${avecNumero} (${total ? Math.round((avecNumero / total) * 100) : 0}%)\n\n🤝 *Bénévoles: ${benevoles?.length || 0}*\n${quartierText}\n\n🗳️ *Votes: ${votes?.length || 0}*\n${votesText}\n\n🔗 *Referrals: ${referrals?.length || 0}*\n\n📊 Dashboard: ${DASHBOARD_URL}\n📄 PDF: ${BASE_URL}/rapport.pdf\n\n_Thiès 2027 : L'Audace de la Transformation !_ 🏙️`;
+async function creerEvenementWA(from, args) {
+  const phone = cleanPhone(from);
+  if (!ADMIN_PHONES.includes(phone)) return "⛔ Commande réservée à l'équipe de campagne.";
+  const parts = args.trim().split(" ");
+  const quartier = parts[0];
+  const details = parts.slice(1).join(" ");
+  if (!quartier || !details) return "❌ Format: *evenement [quartier] [détails]*";
+  const { data: benevoles } = await supabase.from("benevoles").select("*").ilike("quartier", `%${quartier}%`);
+  let notifies = 0;
+  for (const b of benevoles || []) {
+    if (!b.phone) continue;
+    try { await sendWhatsAppMessage(`whatsapp:${b.phone}`, `📅 *Événement Campagne — Thiès 2027*\n\n📍 Quartier: *${quartier}*\n📋 ${details}\n\n🏙️ Votre présence est importante !\n_Alhousseynou Ba_\n\nJërejëf ! 🙏`); notifies++; } catch (e) {}
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return `✅ Événement notifié à *${notifies} bénévole(s)* de *${quartier}* !`;
 }
 
 // ─── Weekly sondage ───────────────────────────────────────────────────────────
@@ -414,12 +273,11 @@ async function sendWeeklySondage() {
   const sondage = SONDAGES[currentSondageIndex % SONDAGES.length];
   currentSondageIndex++;
   const choicesText = Object.entries(sondage.choices).map(([k, v]) => `${k}️⃣ ${v}`).join("\n");
-  const message = `🗳️ *Sondage Hebdomadaire — Thiès 2027*\n\n*${sondage.question}*\n\n${choicesText}\n\n_Tapez le numéro de votre choix !_`;
   const { data: users } = await supabase.from("users").select("phone").not("phone", "is", null);
   if (!users) return;
   let sent = 0;
   for (const user of users) {
-    try { await sendWhatsAppMessage(`whatsapp:${user.phone}`, message); sent++; await new Promise(r => setTimeout(r, 100)); } catch (e) {}
+    try { await sendWhatsAppMessage(`whatsapp:${user.phone}`, `🗳️ *Sondage Hebdomadaire — Thiès 2027*\n\n*${sondage.question}*\n\n${choicesText}\n\n_Tapez le numéro de votre choix !_`); sent++; await new Promise(r => setTimeout(r, 100)); } catch (e) {}
   }
   console.log(`✅ Weekly sondage sent to ${sent} users`);
 }
@@ -435,7 +293,6 @@ function scheduleWeeklySondage() {
   setTimeout(async () => { await sendWeeklySondage(); setInterval(sendWeeklySondage, 7 * 24 * 60 * 60 * 1000); }, msUntilNext);
 }
 
-// ─── Auto follow-up 24h ───────────────────────────────────────────────────────
 async function sendWhatsAppFollowUps() {
   const { data: users } = await supabase.from("users").select("*").not("phone", "is", null);
   if (!users) return;
@@ -446,7 +303,7 @@ async function sendWhatsAppFollowUps() {
     const code = generateCode(user.phone);
     const link = `https://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}`;
     try {
-      await sendWhatsAppMessage(`whatsapp:${user.phone}`, `Salam aleykum *${user.first_name}* ! 🏙️\n\nJërejëf d'avoir rejoint Thiès Ma Ville 2027 !\n\n👉 Avez-vous parlé de la campagne à *3 amis* ?\n\nPartagez votre lien :\n${link}\n\n_Ndank ndank mooy japp golo ci naaye_ 💪`);
+      await sendWhatsAppMessage(`whatsapp:${user.phone}`, `Salam aleykum *${user.first_name}* ! 🏙️\n\nJërejëf d'avoir rejoint Thiès Ma Ville 2027 !\n\n👉 Partagez votre lien à 3 amis :\n${link}\n\n_Ndank ndank mooy japp golo ci naaye_ 💪`);
       await supabase.from("follow_ups").insert({ telegram_id: null, phone: user.phone, type: "24h" });
     } catch (e) { console.error(`❌ Follow-up error:`, e.message); }
     await new Promise(r => setTimeout(r, 100));
@@ -475,7 +332,7 @@ app.get("/api/stats", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get("/", (req, res) => { res.json({ status: "online", agent: BOT_NAME, timestamp: new Date().toISOString() }); });
+app.get("/", (req, res) => { res.json({ status: "online", agent: BOT_NAME, version: "v6" }); });
 
 // ─── Main WhatsApp webhook ────────────────────────────────────────────────────
 app.post("/webhook", async (req, res) => {
@@ -503,17 +360,41 @@ app.post("/webhook", async (req, res) => {
     response.message(welcomeMessage(profileName)); res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── inviter ───────────────────────────────────────────────────────────────────
-  if (["inviter", "invite", "lien"].includes(msgLower)) {
-    const code = generateCode(phone);
-    const { data: refs } = await supabase.from("referrals").select("id").eq("referrer_phone", phone);
-    response.message(`🔗 *Votre lien de recrutement :*\n\nhttps://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}\n\nPartagez avec vos amis !\n\n📊 Vous avez recruté *${refs?.length || 0} supporter(s)*.\n\n_Ndank ndank mooy japp golo ci naaye !_ 🏙️`);
+  // ── audio ─────────────────────────────────────────────────────────────────────
+  if (msgLower.startsWith("audio-wolof ")) {
+    const texte = incomingMsg.replace(/^audio-wolof /i, "").trim();
+    try {
+      const completion = await anthropic.messages.create({
+        model: "claude-opus-4-5", max_tokens: 300, system: WOLOF_PROMPT,
+        messages: [{ role: "user", content: texte }],
+      });
+      const wolofText = completion.content.map(b => b.text || "").join("").trim();
+      const audioBuffer = await generateVoice(wolofText);
+      const audioId = Date.now().toString();
+      audioCache[audioId] = audioBuffer;
+      const audioUrl = `${BASE_URL}/audio/${audioId}`;
+      await sendWhatsAppMedia(from, `🎙️ *Message en Wolof — Alhousseynou Ba*\n\n📝 ${wolofText}`, audioUrl);
+      response.message("🎙️ Message vocal Wolof envoyé !");
+    } catch (e) {
+      console.error("❌ Voice-wolof error:", e.message);
+      response.message("❌ Erreur de génération vocale. Réessayez.");
+    }
     res.type("text/xml"); return res.send(response.toString());
   }
 
-  // ── dashboard ─────────────────────────────────────────────────────────────────
-  if (["dashboard", "stats"].includes(msgLower)) {
-    response.message(`📊 *Dashboard Campagne Thiès 2027*\n\n🔗 ${DASHBOARD_URL}\n\nSupporters, bénévoles, votes, carte — tout en un coup d'œil ! 🏙️`);
+  if (msgLower.startsWith("audio ")) {
+    const texte = incomingMsg.replace(/^audio /i, "").trim();
+    try {
+      const audioBuffer = await generateVoice(texte);
+      const audioId = Date.now().toString();
+      audioCache[audioId] = audioBuffer;
+      const audioUrl = `${BASE_URL}/audio/${audioId}`;
+      await sendWhatsAppMedia(from, `🎙️ *Message vocal — Alhousseynou Ba*`, audioUrl);
+      response.message("🎙️ Message vocal envoyé !");
+    } catch (e) {
+      console.error("❌ Voice error:", e.message);
+      response.message("❌ Erreur de génération vocale. Réessayez.");
+    }
     res.type("text/xml"); return res.send(response.toString());
   }
 
@@ -531,17 +412,36 @@ app.post("/webhook", async (req, res) => {
     res.type("text/xml"); return res.send(response.toString());
   }
 
+  // ── inviter ───────────────────────────────────────────────────────────────────
+  if (["inviter", "invite", "lien"].includes(msgLower)) {
+    const code = generateCode(phone);
+    const { data: refs } = await supabase.from("referrals").select("id").eq("referrer_phone", phone);
+    response.message(`🔗 *Votre lien de recrutement :*\n\nhttps://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}\n\nPartagez avec vos amis !\n\n📊 Vous avez recruté *${refs?.length || 0} supporter(s)*.\n\n_Ndank ndank mooy japp golo ci naaye !_ 🏙️`);
+    res.type("text/xml"); return res.send(response.toString());
+  }
+
+  // ── dashboard ─────────────────────────────────────────────────────────────────
+  if (["dashboard", "stats"].includes(msgLower)) {
+    response.message(`📊 *Dashboard Campagne*\n\n🔗 ${DASHBOARD_URL}\n\nSupporters, bénévoles, votes, carte ! 🏙️`);
+    res.type("text/xml"); return res.send(response.toString());
+  }
+
+  // ── pdf (admin) ───────────────────────────────────────────────────────────────
+  if (msgLower === "pdf" && ADMIN_PHONES.includes(phone)) {
+    await sendWeeklyPDFRapport();
+    response.message(`📄 Rapport PDF généré !\n\n🔗 ${BASE_URL}/rapport.pdf`);
+    res.type("text/xml"); return res.send(response.toString());
+  }
+
   // ── evenement (admin) ─────────────────────────────────────────────────────────
   if (msgLower.startsWith("evenement ") && ADMIN_PHONES.includes(phone)) {
-    const args = incomingMsg.replace(/^evenement /i, "");
-    const reply = await creerEvenementWA(from, args);
+    const reply = await creerEvenementWA(from, incomingMsg.replace(/^evenement /i, ""));
     response.message(reply); res.type("text/xml"); return res.send(response.toString());
   }
 
   // ── tache (admin) ─────────────────────────────────────────────────────────────
   if (msgLower.startsWith("tache ") && ADMIN_PHONES.includes(phone)) {
-    const args = incomingMsg.replace(/^tache /i, "");
-    const reply = await assignerTacheWA(from, args);
+    const reply = await assignerTacheWA(from, incomingMsg.replace(/^tache /i, ""));
     response.message(reply); res.type("text/xml"); return res.send(response.toString());
   }
 
@@ -553,14 +453,11 @@ app.post("/webhook", async (req, res) => {
 
   // ── rapport (admin) ───────────────────────────────────────────────────────────
   if (msgLower === "rapport" && ADMIN_PHONES.includes(phone)) {
-    const rapport = await buildRapport();
-    response.message(rapport); res.type("text/xml"); return res.send(response.toString());
-  }
-
-  // ── pdf (admin) ───────────────────────────────────────────────────────────────
-  if (msgLower === "pdf" && ADMIN_PHONES.includes(phone)) {
-    await sendWeeklyPDFRapport();
-    response.message(`📄 Rapport PDF généré et envoyé !\n\n🔗 ${BASE_URL}/rapport.pdf`);
+    const { data: users } = await supabase.from("users").select("*");
+    const { data: benevoles } = await supabase.from("benevoles").select("*");
+    const { data: votes } = await supabase.from("votes").select("*");
+    const { data: referrals } = await supabase.from("referrals").select("*");
+    response.message(`📊 *Rapport — Thiès 2027*\n\n👥 Supporters: ${users?.length || 0}\n🤝 Bénévoles: ${benevoles?.length || 0}\n🗳️ Votes: ${votes?.length || 0}\n🔗 Referrals: ${referrals?.length || 0}\n\n📊 ${DASHBOARD_URL}\n📄 ${BASE_URL}/rapport.pdf\n\n_Thiès 2027 !_ 🏙️`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
@@ -570,7 +467,7 @@ app.post("/webhook", async (req, res) => {
     const { data: taches } = await supabase.from("taches").select("*").eq("status", "active");
     if (taches && taches.length > 0) {
       await supabase.from("tache_confirmations").insert({ tache_id: taches[0].id, telegram_id: null, phone, status });
-      response.message(status === "fait" ? `✅ Jërejëf ! Mission confirmée. Tu es un vrai champion de Thiès 2027 ! 💪🏙️` : `❌ Merci pour le retour ! L'équipe va vous contacter. Jërejëf ! 🙏`);
+      response.message(status === "fait" ? `✅ Jërejëf ! Mission confirmée ! 💪🏙️` : `❌ Merci ! L'équipe va vous contacter. 🙏`);
       res.type("text/xml"); return res.send(response.toString());
     }
   }
@@ -578,7 +475,7 @@ app.post("/webhook", async (req, res) => {
   // ── sondage ───────────────────────────────────────────────────────────────────
   if (msgLower === "sondage") {
     session.awaitingSondage = true;
-    response.message(`🗳️ *Sondage Thiès 2027*\n\nQuel est votre problème principal à Thiès ?\n\n1️⃣ Routes et pavage\n2️⃣ Eau et électricité\n3️⃣ Emploi et jeunesse\n4️⃣ Santé et hôpital\n5️⃣ Éducation et écoles`);
+    response.message(`🗳️ *Sondage Thiès 2027*\n\nQuel est votre problème principal ?\n\n1️⃣ Routes et pavage\n2️⃣ Eau et électricité\n3️⃣ Emploi et jeunesse\n4️⃣ Santé et hôpital\n5️⃣ Éducation et écoles`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
@@ -586,7 +483,7 @@ app.post("/webhook", async (req, res) => {
     const reponses = { "1": "Routes et pavage", "2": "Eau et électricité", "3": "Emploi et jeunesse", "4": "Santé et hôpital", "5": "Éducation et écoles" };
     await supabase.from("votes").insert({ telegram_id: null, question: "Problème principal à Thiès", reponse: reponses[incomingMsg] });
     session.awaitingSondage = false;
-    response.message(`✅ Merci ! Jërejëf 🙏\n\nVotre choix: *${reponses[incomingMsg]}*\n\n👉 Recrutez : tapez *inviter*`);
+    response.message(`✅ Merci ! Jërejëf 🙏\n\nVotre choix: *${reponses[incomingMsg]}*\n\n👉 Tapez *inviter* pour recruter !`);
     res.type("text/xml"); return res.send(response.toString());
   }
 
@@ -639,20 +536,17 @@ app.post("/webhook", async (req, res) => {
     session.history.push({ role: "assistant", content: reply });
     if (reply.length > 1580) { const chunks = reply.match(/.{1,1580}(\s|$)/gs) || [reply]; chunks.forEach(chunk => response.message(chunk.trim())); }
     else response.message(reply);
-  } catch (err) { response.message("⚠️ Une erreur est survenue. Veuillez réessayer."); }
+  } catch (err) { response.message("⚠️ Une erreur est survenue. Réessayez."); }
 
   res.type("text/xml"); res.send(response.toString());
 });
 
-app.post("/reset/:phone", (req, res) => {
-  sessions.delete(`whatsapp:+${req.params.phone}`);
-  res.json({ reset: true });
-});
+app.post("/reset/:phone", (req, res) => { sessions.delete(`whatsapp:+${req.params.phone}`); res.json({ reset: true }); });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🏙️ ${BOT_NAME} WhatsApp Bot v5 running on port ${PORT}`);
+  console.log(`🏙️ ${BOT_NAME} WhatsApp Bot v6 running on port ${PORT}`);
   scheduleWeeklySondage();
   scheduleWhatsAppFollowUps();
   scheduleWeeklyPDFRapport();
