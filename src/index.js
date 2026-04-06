@@ -458,11 +458,46 @@ app.post("/reset/:phone", (req, res) => {
   const phone = `whatsapp:+${req.params.phone}`;
   sessions.delete(phone);
   res.json({ reset: true, phone });
-});
+}); 
+// ─── Auto follow-up 24h WhatsApp ─────────────────────────────────────────────
+async function sendWhatsAppFollowUps() {
+  const { data: users } = await supabase.from("users").select("*")
+    .not("phone", "is", null);
+  if (!users) return;
+
+  for (const user of users) {
+    const { data: existing } = await supabase.from("follow_ups")
+      .select("id").eq("phone", user.phone).eq("type", "24h").single();
+    if (existing) continue;
+
+    const firstSeen = new Date(user.first_seen);
+    const hoursSince = (Date.now() - firstSeen) / (1000 * 60 * 60);
+    if (hoursSince < 24) continue;
+
+    const code = generateCode(user.phone);
+    const link = `https://wa.me/${WHATSAPP_NUMBER.replace("whatsapp:+", "")}?text=TMV${code}`;
+    try {
+      await sendWhatsAppMessage(`whatsapp:${user.phone}`,
+        `Salam aleykum *${user.first_name}* ! 🏙️\n\nJërejëf d'avoir rejoint Thiès Ma Ville 2027 !\n\n👉 Avez-vous parlé de la campagne à *3 amis* ?\n\nPartagez votre lien :\n${link}\n\n_Ndank ndank mooy japp golo ci naaye_ 💪`);
+      await supabase.from("follow_ups").insert({ telegram_id: null, phone: user.phone, type: "24h" });
+      console.log(`✅ WhatsApp follow-up sent to ${user.first_name}`);
+    } catch (e) {
+      console.error(`❌ Follow-up error:`, e.message);
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
+function scheduleWhatsAppFollowUps() {
+  setInterval(sendWhatsAppFollowUps, 60 * 60 * 1000);
+  setTimeout(sendWhatsAppFollowUps, 5 * 60 * 1000);
+  console.log("⏰ WhatsApp follow-up scheduler started");
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🏙️ ${BOT_NAME} WhatsApp Bot running on port ${PORT}`);
   scheduleWeeklySondage();
-});
+scheduleWhatsAppFollowUps();
+  });
