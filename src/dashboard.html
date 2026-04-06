@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Thiès 2027 — Dashboard Campagne</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --green: #00c853;
+    --green-dark: #007c2e;
+    --green-glow: #00c85322;
+    --gold: #ffd600;
+    --red: #ff1744;
+    --bg: #050a05;
+    --bg2: #0a120a;
+    --bg3: #0f1f0f;
+    --card: #0d1a0d;
+    --border: #1a3a1a;
+    --text: #e8f5e9;
+    --muted: #4a7a4a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+  /* Header */
+  header {
+    border-bottom: 2px solid var(--green);
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 48px; height: 48px;
+    background: var(--green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 0 24px var(--green-glow);
+  }
+  .logo-text h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: var(--green);
+    letter-spacing: 2px;
+    line-height: 1;
+  }
+  .logo-text p {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .header-right { text-align: right; }
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--green-glow);
+    border: 1px solid var(--green);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    color: var(--green);
+    margin-bottom: 6px;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 #00c85355; }
+    50% { opacity: 0.5; box-shadow: 0 0 0 5px transparent; }
+  }
+  .last-updated { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.2s;
+  }
+  .stat-card:hover { border-color: var(--green); transform: translateY(-2px); }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--green);
+  }
+  .stat-card.gold::before { background: var(--gold); }
+  .stat-card.red::before { background: var(--red); }
+  .stat-card.blue::before { background: #2979ff; }
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 44px;
+    color: var(--green);
+    line-height: 1;
+  }
+  .stat-card.gold .stat-value { color: var(--gold); }
+  .stat-card.red .stat-value { color: var(--red); }
+  .stat-card.blue .stat-value { color: #2979ff; }
+  .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* Sections */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: var(--green);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Language bars */
+  .lang-bars { display: flex; flex-direction: column; gap: 14px; }
+  .lang-row { display: flex; align-items: center; gap: 10px; }
+  .lang-name { width: 70px; font-size: 12px; color: var(--text); font-family: 'Space Mono', monospace; }
+  .lang-bar-bg { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+  .lang-bar-fill { height: 100%; background: var(--green); border-radius: 4px; width: 0; transition: width 1.2s ease; }
+  .lang-count { width: 36px; text-align: right; font-size: 12px; font-family: 'Space Mono', monospace; color: var(--muted); }
+
+  /* Votes */
+  .votes-list { display: flex; flex-direction: column; gap: 14px; }
+  .vote-row { display: flex; flex-direction: column; gap: 6px; }
+  .vote-label { display: flex; justify-content: space-between; font-size: 13px; }
+  .vote-label .vl-name { color: var(--text); }
+  .vote-label .vl-count { color: var(--green); font-family: 'Space Mono', monospace; font-weight: 700; }
+  .vote-bar-bg { height: 9px; background: var(--bg3); border-radius: 5px; overflow: hidden; }
+  .vote-bar-fill { height: 100%; background: linear-gradient(90deg, var(--green-dark), var(--green)); border-radius: 5px; width: 0; transition: width 1.3s ease; }
+
+  /* Quartiers */
+  .quartier-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .quartier-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 10px;
+    text-align: center;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .quartier-card:hover { border-color: var(--green); transform: translateY(-2px); }
+  .quartier-count { font-family: 'Bebas Neue', sans-serif; font-size: 34px; color: var(--green); line-height: 1; }
+  .quartier-name { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Referrals */
+  .ref-list { display: flex; flex-direction: column; gap: 8px; }
+  .ref-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    background: var(--bg3);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    gap: 10px;
+  }
+  .ref-rank { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--muted); width: 28px; }
+  .ref-rank.top { color: var(--gold); }
+  .ref-name { font-size: 14px; font-weight: 600; flex: 1; }
+  .ref-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+    background: var(--green-glow);
+    border: 1px solid var(--green);
+    border-radius: 20px;
+    padding: 3px 10px;
+  }
+
+  /* Benevoles table */
+  .table-wrapper { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  tr:hover td { background: var(--bg3); }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+  }
+  .badge-green { background: var(--green-glow); color: var(--green); border: 1px solid var(--green); }
+  .badge-gold { background: #ffd60011; color: var(--gold); border: 1px solid var(--gold); }
+  .badge-muted { background: #ffffff08; color: var(--muted); border: 1px solid var(--border); }
+
+  /* Phone coverage */
+  .coverage-bar {
+    height: 14px;
+    background: var(--bg3);
+    border-radius: 7px;
+    overflow: hidden;
+    margin: 12px 0 8px;
+  }
+  .coverage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green-dark), var(--green));
+    border-radius: 7px;
+    width: 0;
+    transition: width 1.4s ease;
+  }
+  .coverage-labels { display: flex; justify-content: space-between; font-size: 12px; }
+  .coverage-labels span:first-child { color: var(--green); font-family: 'Space Mono', monospace; }
+  .coverage-labels span:last-child { color: var(--muted); font-family: 'Space Mono', monospace; }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { color: var(--muted); font-family: 'Space Mono', monospace; font-size: 12px; }
+
+  /* Empty state */
+  .empty { color: var(--muted); font-size: 13px; font-style: italic; padding: 20px 0; text-align: center; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 30px 0 20px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    border-top: 1px solid var(--border);
+    margin-top: 20px;
+  }
+  footer a { color: var(--green); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🏙️</div>
+      <div class="logo-text">
+        <h1>Thiès Ma Ville</h1>
+        <p>Dashboard Campagne 2027</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><span class="live-dot"></span> LIVE</div>
+      <div class="last-updated" id="lastUpdated">Chargement...</div>
+    </div>
+  </header>
+
+  <div id="app">
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>Chargement des données...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  async function fetchData() {
+    const res = await fetch('/api/stats');
+    if (!res.ok) throw new Error('API error');
+    return res.json();
+  }
+
+  function pct(a, b) { return b ? Math.round((a / b) * 100) : 0; }
+
+  function disponibiliteLabel(d) {
+    if (!d) return '';
+    if (d.includes('1') || d.toLowerCase().includes('week')) return 'Week-end';
+    if (d.includes('2') || d.toLowerCase().includes('soir')) return 'Soirs';
+    if (d.includes('3') || d.toLowerCase().includes('plein')) return 'Temps plein';
+    return d;
+  }
+
+  function disponibiliteBadge(d) {
+    const label = disponibiliteLabel(d);
+    if (label === 'Temps plein') return `<span class="badge badge-green">${label}</span>`;
+    if (label === 'Soirs') return `<span class="badge badge-gold">${label}</span>`;
+    return `<span class="badge badge-muted">${label}</span>`;
+  }
+
+  function render(data) {
+    const { users, benevoles, votes, referrals } = data;
+
+    const total = users.length;
+    const avecNumero = users.filter(u => u.phone).length;
+    const totalBen = benevoles.length;
+    const totalVotes = votes.length;
+    const totalRefs = referrals.length;
+
+    // Language counts
+    const langs = {};
+    users.forEach(u => { langs[u.language] = (langs[u.language] || 0) + 1; });
+    const langList = Object.entries(langs).sort((a, b) => b[1] - a[1]);
+
+    // Votes breakdown
+    const voteMap = {};
+    votes.forEach(v => { voteMap[v.reponse] = (voteMap[v.reponse] || 0) + 1; });
+    const voteList = Object.entries(voteMap).sort((a, b) => b[1] - a[1]);
+    const maxVotes = voteList[0]?.[1] || 1;
+
+    // Quartiers
+    const quartierMap = {};
+    benevoles.forEach(b => { quartierMap[b.quartier] = (quartierMap[b.quartier] || 0) + 1; });
+    const quartierList = Object.entries(quartierMap).sort((a, b) => b[1] - a[1]);
+
+    // Top referrers
+    const refMap = {};
+    referrals.forEach(r => {
+      const key = r.referrer_telegram_id || r.referrer_phone || 'unknown';
+      refMap[key] = (refMap[key] || 0) + 1;
+    });
+    const topRefs = Object.entries(refMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key, count]) => {
+      const u = users.find(u => String(u.telegram_id) === String(key) || u.phone === key);
+      return { name: u ? `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}` : key, count };
+    });
+
+    document.getElementById('lastUpdated').textContent = 'Mis à jour: ' + new Date().toLocaleTimeString('fr-FR');
+
+    document.getElementById('app').innerHTML = `
+      <!-- KPI Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Supporters</div>
+          <div class="stat-value">${total}</div>
+          <div class="stat-sub">Total inscrits</div>
+        </div>
+        <div class="stat-card gold">
+          <div class="stat-label">Bénévoles</div>
+          <div class="stat-value">${totalBen}</div>
+          <div class="stat-sub">Équipe terrain</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Votes</div>
+          <div class="stat-value">${totalVotes}</div>
+          <div class="stat-sub">Sondages</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Referrals</div>
+          <div class="stat-value">${totalRefs}</div>
+          <div class="stat-sub">Recrutements</div>
+        </div>
+      </div>
+
+      <!-- Phone coverage -->
+      <div class="section">
+        <div class="section-title"><span>📱</span> Couverture Numéros</div>
+        <div class="coverage-bar">
+          <div class="coverage-fill" id="coverageFill"></div>
+        </div>
+        <div class="coverage-labels">
+          <span>${avecNumero} avec numéro (${pct(avecNumero, total)}%)</span>
+          <span>${total - avecNumero} sans numéro</span>
+        </div>
+      </div>
+
+      <!-- Languages + Votes -->
+      <div class="grid-2">
+        <div class="section">
+          <div class="section-title"><span>🌍</span> Langues</div>
+          <div class="lang-bars" id="langBars">
+            ${langList.length === 0 ? '<div class="empty">Aucune donnée</div>' :
+              langList.map(([lang, count]) => `
+                <div class="lang-row">
+                  <div class="lang-name">${lang === 'fr' ? '🇫🇷 FR' : lang === 'en' ? '🇺🇸 EN' : lang === 'ar' ? '🇸🇦 AR' : lang.toUpperCase()}</div>
+                  <div class="lang-bar-bg"><div class="lang-bar-fill" data-w="${pct(count, total)}"></div></div>
+                  <div class="lang-count">${count}</div>
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title"><span>🗳️</span> Résultats Sondage</div>
+          <div class="votes-list">
+            ${voteList.length === 0 ? '<div class="empty">Aucun vote encore</div>' :
+              voteList.map(([reponse, count]) => `
+                <div class="vote-row">
+                  <div class="vote-label">
+                    <span class="vl-name">${reponse}</span>
+                    <span class="vl-count">${count}</span>
+                  </div>
+                  <div class="vote-bar-bg"><div class="vote-bar-fill" data-w="${pct(count, maxVotes)}"></div></div>
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Quartiers -->
+      <div class="section">
+        <div class="section-title"><span>🗺️</span> Bénévoles par Quartier</div>
+        ${quartierList.length === 0
+          ? '<div class="empty">Aucun bénévole encore</div>'
+          : `<div class="quartier-grid">
+              ${quartierList.map(([q, n]) => `
+                <div class="quartier-card">
+                  <div class="quartier-count">${n}</div>
+                  <div class="quartier-name">${q}</div>
+                </div>
+              `).join('')}
+            </div>`
+        }
+      </div>
+
+      <!-- Top Referrers + Benevoles -->
+      <div class="grid-2">
+        <div class="section">
+          <div class="section-title"><span>🔗</span> Top Recruteurs</div>
+          <div class="ref-list">
+            ${topRefs.length === 0
+              ? '<div class="empty">Aucun recrutement encore</div>'
+              : topRefs.map((r, i) => `
+                <div class="ref-row">
+                  <div class="ref-rank ${i === 0 ? 'top' : ''}">${i + 1}</div>
+                  <div class="ref-name">${r.name}</div>
+                  <div class="ref-badge">${r.count} recruté${r.count > 1 ? 's' : ''}</div>
+                </div>
+              `).join('')
+            }
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title"><span>🤝</span> Derniers Bénévoles</div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Quartier</th>
+                  <th>Dispo</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${benevoles.length === 0
+                  ? '<tr><td colspan="3" class="empty">Aucun bénévole</td></tr>'
+                  : benevoles.slice(-10).reverse().map(b => `
+                    <tr>
+                      <td>${b.first_name}${b.last_name ? ' ' + b.last_name : ''}</td>
+                      <td>${b.quartier || '—'}</td>
+                      <td>${disponibiliteBadge(b.disponibilite)}</td>
+                    </tr>
+                  `).join('')
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p>🏙️ <a href="https://alhousseynouba.com">alhousseynouba.com</a> &nbsp;|&nbsp; <a href="https://thies.city">thies.city</a> &nbsp;|&nbsp; <a href="https://senegaluni.com">senegaluni.com</a></p>
+        <p style="margin-top:8px">Thiès 2027 — L'Audace de la Transformation</p>
+      </footer>
+    `;
+
+    // Animate bars after render
+    setTimeout(() => {
+      document.querySelectorAll('.lang-bar-fill[data-w]').forEach(el => {
+        el.style.width = el.dataset.w + '%';
+      });
+      document.querySelectorAll('.vote-bar-fill[data-w]').forEach(el => {
+        el.style.width = el.dataset.w + '%';
+      });
+      const cf = document.getElementById('coverageFill');
+      if (cf) cf.style.width = pct(avecNumero, total) + '%';
+    }, 100);
+  }
+
+  async function init() {
+    try {
+      const data = await fetchData();
+      render(data);
+    } catch (err) {
+      document.getElementById('app').innerHTML = `
+        <div class="section" style="text-align:center;padding:40px">
+          <div style="font-size:40px;margin-bottom:16px">⚠️</div>
+          <div style="color:var(--red);font-family:'Space Mono',monospace;font-size:13px">Erreur de chargement</div>
+          <div style="color:var(--muted);font-size:12px;margin-top:8px">${err.message}</div>
+          <button onclick="init()" style="margin-top:20px;background:var(--green);color:#000;border:none;padding:10px 24px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer">Réessayer</button>
+        </div>
+      `;
+    }
+  }
+
+  init();
+  // Refresh every 60 seconds
+  setInterval(init, 60000);
+</script>
+</body>
+</html>
