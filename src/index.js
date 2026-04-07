@@ -497,6 +497,15 @@ app.post("/webhook", async (req, res) => {
   const greetings = ["bonjour", "salam", "hello", "hi", "salut", "start", "aide", "help"];
   if (greetings.some(g => msgLower.startsWith(g)) && session.history.length === 0) {
     response.message(welcomeMessage(profileName));
+    // Message vocal de bienvenue en Wolof
+    try {
+      const wolofWelcome = `Assalamoualeykoum ${profileName || ""} ! Djeureudjeuf ci yèguèle ci botte bi di Tièss 2027. Mâ ngui Tièss Ma Vile, l'assistant d'Alhousseynou Ba. N'dank n'dank mouy djape golou ci naaye. Tièss maayo !`;
+      const { audioId } = await generateVoiceOgg(wolofWelcome);
+      const audioUrl = `${BASE_URL}/audio/${audioId}`;
+      await sendWhatsAppMedia(from, `🎙️ *Bienvenue — Thiès 2027 !*`, audioUrl);
+    } catch(e) {
+      console.log("Voice welcome skipped:", e.message);
+    }
     res.type("text/xml"); return res.send(response.toString());
   }
 
