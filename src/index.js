@@ -90,9 +90,9 @@ async function generateVoiceOgg(text) {
       text,
       model_id: "eleven_multilingual_v2",
       voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.5,
+        stability: 0.35,
+similarity_boost: 0.80,
+style: 0.40,
         use_speaker_boost: true,
       },
     }),
