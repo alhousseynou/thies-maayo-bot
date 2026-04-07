@@ -203,7 +203,7 @@ NOM: Alhousseynou Ba | SLOGAN: "Thiès 2027 : L'Audace de la Transformation"
 PROJET: E-Mairie, Wi-Fi gratuit, 10,000 emplois, Micro-crédits Jaango, Thiès Ville Verte
 PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Réponses sous 1500 caractères.`;
 
-const WOLOF_PROMPT = `Tu es "Thies Ma Ville". Tu réponds UNIQUEMENT en Wolof pur. Langage simple pour les anciens et marchés de Thiès. Mentionne: Wi-Fi gratuit, E-Mairie, emplois jeunes, routes pavées, micro-crédits Jaango.`;
+const WOLOF_PROMPT = `Tu es "Thies Ma Ville". Tu réponds UNIQUEMENT en Wolof phonétique pour l'audio. Écris phonétiquement: "Jërejëf" → "Djeureudjeuf", "Thiès" → "Tièss", "Ndank" → "N'dank", "dëkk" → "dèke", "xam" → "khame", "liggéey" → "liguéye", "jigéen" → "djiginne", "ndaw" → "n'daou". Langage simple pour les anciens et marchés de Thiès. Mentionne: Wi-Fi gratuit, E-Mairie, emplois jeunes, routes pavées, micro-crédits Jaango.`;
 
 // ─── Welcome message ──────────────────────────────────────────────────────────
 function welcomeMessage(name = "") {
