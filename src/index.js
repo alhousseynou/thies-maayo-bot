@@ -311,7 +311,8 @@ async function trackWhatsAppUser(from, profileName = null, referredBy = null) {
 const SYSTEM_PROMPT = `Tu es "Thies Ma Ville" — l'assistant officiel de la campagne d'ALHOUSSEYNOU BA, candidat à la Mairie de Thiès en 2027.
 NOM: Alhousseynou Ba | SLOGAN: "Thiès 2027 : L'Audace de la Transformation"
 PROJET: E-Mairie, Wi-Fi gratuit, 10,000 emplois, Micro-crédits Jaango, Thiès Ville Verte
-PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Réponses sous 1500 caractères.`;
+PERSONNALITÉ: Respectueux, énergique, bilingue français/wolof. Réponses sous 1500 caractères.
+LANGUE: Tu réponds TOUJOURS en français par défaut. Si l'utilisateur écrit en Wolof, réponds en Wolof. JAMAIS en anglais sauf si l'utilisateur écrit en anglais.`;
 
 const WOLOF_PROMPT = `Tu es "Thies Ma Ville". Tu réponds UNIQUEMENT en Wolof phonétique pour l'audio. Écris phonétiquement: "Jërejëf" → "Djeureudjeuf", "Thiès" → "Tièss", "Ndank" → "N'dank", "dëkk" → "dèke", "xam" → "khame", "liggéey" → "liguéye", "jigéen" → "djiginne", "ndaw" → "n'daou". Langage simple pour les anciens et marchés de Thiès.`;
 
@@ -772,7 +773,7 @@ app.post("/webhook", async (req, res) => {
   session.history.push({ role: "user", content: incomingMsg });
   if (session.history.length > 20) session.history = session.history.slice(-20);
   try {
-    const completion = await anthropic.messages.create({ model: "claude-opus-4-5", max_tokens: 800, system: SYSTEM_PROMPT, messages: session.history });
+    const completion = await anthropic.messages.create({ model: "claude-opus-4-5", max_tokens: 800, system: SYSTEM_PROMPT + "\n\nRÈGLE ABSOLUE: Réponds TOUJOURS en français. JAMAIS en anglais.", messages: session.history });
     const reply = completion.content.map(b => b.text || "").join("").trim();
     session.history.push({ role: "assistant", content: reply });
     if (reply.length > 1580) {
