@@ -1,8 +1,8 @@
 // Thies Ma Ville — WhatsApp Bot v8 — Voice + Carte de Soutien PDF
 
 import express from "express";
-import pkg from "twilio";
-const { twiml } = pkg;
+import twilio from "twilio";
+const { twiml } = twilio;
 import Anthropic from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
@@ -33,7 +33,7 @@ const BASE_URL = process.env.BASE_URL || "https://thies-maayo-bot.onrender.com";
 const ADMIN_PHONES = ["+221771980297"];
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || "RsFOT0jgZkwkcYbjMH9c";
-
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 // ─── Audio temp directory ─────────────────────────────────────────────────────
 const AUDIO_DIR = join(__dirname, "audio_tmp");
 if (!existsSync(AUDIO_DIR)) mkdirSync(AUDIO_DIR, { recursive: true });
@@ -205,8 +205,7 @@ function cleanOldAudioFiles() {
     for (const file of files) {
       const filePath = join(AUDIO_DIR, file);
       const stat = statSync(filePath);
-      if (now - stat.mtimeMs > 60 * 60 * 1000) unlinkSync(filePath);
-    }
+if (!file.endsWith(".pdf") && now - stat.mtimeMs > 60 * 60 * 1000) unlinkSync(filePath);    }
   } catch (e) {
     console.log("ℹ️ Audio cleanup skipped:", e.message);
   }
@@ -269,16 +268,15 @@ app.get("/audio/:id", (req, res) => {
 
 // ─── Send WhatsApp ────────────────────────────────────────────────────────────
 async function sendWhatsAppMessage(to, body) {
-  const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  try { await client.messages.create({ from: WHATSAPP_NUMBER, to, body }); }
+  try { await twilioClient.messages.create({ from: WHATSAPP_NUMBER, to, body }); }
   catch (err) { console.error("❌ Twilio send error:", err.message); }
 }
 
 async function sendWhatsAppMedia(to, body, mediaUrl) {
-  const client = pkg(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  
   try {
     console.log(`📤 Sending media to ${to}: ${mediaUrl}`);
-    await client.messages.create({ from: WHATSAPP_NUMBER, to, body, mediaUrl: [mediaUrl] });
+    await twilioClient.messages.create({ from: WHATSAPP_NUMBER, to, body, mediaUrl: [mediaUrl] });
     console.log("✅ Media sent!");
   } catch (err) { console.error("❌ Twilio media error:", err.message); throw err; }
 }
